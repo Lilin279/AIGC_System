@@ -1,0 +1,279 @@
+:root {
+  color: #1f2937;
+  background: #f4f7fb;
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+select,
+textarea,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  min-height: 92px;
+  padding: 18px 28px;
+  background: #ffffff;
+  border-bottom: 1px solid #dbe3ee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.topbar h1,
+.panel-heading h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.course-picker {
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.course-picker select {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  outline: none;
+}
+
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 360px;
+  min-height: 0;
+}
+
+.sidebar {
+  padding: 18px 14px;
+  border-right: 1px solid #dbe3ee;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nav,
+.primary {
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.nav {
+  width: 100%;
+  padding: 12px;
+  color: #374151;
+  background: transparent;
+}
+
+.nav.active {
+  color: #0f766e;
+  background: #d9f4ef;
+}
+
+.primary {
+  min-height: 38px;
+  padding: 9px 12px;
+  color: #ffffff;
+  background: #0f766e;
+}
+
+.metric-panel {
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.metric-panel span {
+  color: #6b7280;
+}
+
+.status {
+  margin: auto 0 0;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.graph-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.panel-heading {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.panel-heading span {
+  max-width: 48%;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.graph-canvas {
+  flex: 1;
+  min-height: 620px;
+  width: 100%;
+}
+
+.detail-panel {
+  border-left: 1px solid #dbe3ee;
+  background: #f8fafc;
+  overflow: auto;
+}
+
+.panel-stack {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tool-section {
+  padding: 16px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.tool-section h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-section p {
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.tool-section input,
+.tool-section textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.tool-section textarea {
+  min-height: 92px;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.node-detail,
+.answer,
+.recommend-item {
+  border-left: 3px solid #f2994a;
+  padding: 10px 12px;
+  background: #fff8ef;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.node-detail span,
+.recommend-item span,
+.answer small,
+.node-detail small {
+  color: #5b6472;
+}
+
+.recommend-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 170px minmax(0, 1fr);
+  }
+
+  .detail-panel {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 1px solid #dbe3ee;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #dbe3ee;
+  }
+
+  .panel-heading span {
+    max-width: none;
+  }
+
+  .graph-canvas {
+    min-height: 520px;
+  }
+}
