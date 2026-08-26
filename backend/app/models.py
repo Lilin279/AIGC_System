@@ -14,10 +14,29 @@ class GraphStats(BaseModel):
     relation_types: int = 0
 
 
+class User(BaseModel):
+    id: str
+    name: str
+    role: Literal["admin", "teacher", "student"]
+    organization: str = "演示学校"
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str = ""
+    role: Literal["admin", "teacher", "student"] = "teacher"
+
+
+class LoginResult(BaseModel):
+    token: str
+    user: User
+
+
 class Course(BaseModel):
     id: str
     name: str
     description: str
+    status: Literal["draft", "published", "archived"] = "draft"
     document_count: int = 0
     stats: GraphStats = Field(default_factory=GraphStats)
 
@@ -25,6 +44,13 @@ class Course(BaseModel):
 class CourseCreate(BaseModel):
     name: str
     description: str = ""
+    status: Literal["draft", "published", "archived"] = "draft"
+
+
+class CourseUpdate(BaseModel):
+    name: str
+    description: str = ""
+    status: Literal["draft", "published", "archived"] = "draft"
 
 
 class DocumentInfo(BaseModel):
@@ -63,6 +89,13 @@ class KnowledgeEdge(BaseModel):
 
 
 class KnowledgeEdgeCreate(BaseModel):
+    source: str
+    target: str
+    relation: RelationType
+    label: str = ""
+
+
+class KnowledgeEdgeUpdate(BaseModel):
     source: str
     target: str
     relation: RelationType

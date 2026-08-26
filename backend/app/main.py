@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.models import (
     Course,
     CourseCreate,
+    CourseUpdate,
     DocumentInfo,
     ExtractionResult,
     KnowledgeEdge,
     KnowledgeEdgeCreate,
+    KnowledgeEdgeUpdate,
     KnowledgeGraph,
     KnowledgeNode,
     KnowledgeNodeCreate,
@@ -17,6 +19,9 @@ from app.models import (
     LearningPathResult,
     QARequest,
     QAResult,
+    LoginRequest,
+    LoginResult,
+    User,
 )
 from app.services.parser import parse_text_file
 from app.services.qa import answer_question
@@ -49,6 +54,13 @@ def health() -> dict:
     return {"status": "ok", "mode": "offline-demo"}
 
 
+@app.post("/api/auth/login", response_model=LoginResult)
+def login(payload: LoginRequest) -> LoginResult:
+    display_name = payload.username.strip() or ("教师用户" if payload.role == "teacher" else "学生用户")
+    user = User(id=f"{payload.role}_demo", name=display_name, role=payload.role, organization="金扬智能示范学校")
+    return LoginResult(token=f"demo-token-{payload.role}", user=user)
+
+
 @app.post("/api/admin/reset-demo")
 def reset_demo() -> dict:
     storage.reset_store()
@@ -65,6 +77,22 @@ def create_course(payload: CourseCreate) -> Course:
     return storage.add_course(payload)
 
 
+@app.put("/api/courses/{course_id}", response_model=Course)
+def update_course(course_id: str, payload: CourseUpdate) -> Course:
+    try:
+        return storage.update_course(course_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/api/courses/{course_id}")
+def delete_course(course_id: str) -> dict:
+    try:
+        return storage.delete_course(course_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post("/api/courses/{course_id}/documents", response_model=DocumentInfo)
 async def upload_document(course_id: str, file: UploadFile = File(...)) -> DocumentInfo:
     raw = await file.read()
@@ -75,6 +103,22 @@ async def upload_document(course_id: str, file: UploadFile = File(...)) -> Docum
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/courses/{course_id}/documents", response_model=list[DocumentInfo])
+def list_documents(course_id: str) -> list[DocumentInfo]:
+    try:
+        return storage.list_documents(course_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/api/courses/{course_id}/documents/{document_id}")
+def delete_document(course_id: str, document_id: str) -> dict:
+    try:
+        return storage.delete_document(course_id, document_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/courses/{course_id}/extract", response_model=ExtractionResult)
@@ -127,6 +171,14 @@ def delete_node(course_id: str, node_id: str) -> dict:
 def add_edge(course_id: str, payload: KnowledgeEdgeCreate) -> KnowledgeEdge:
     try:
         return storage.add_edge(course_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put("/api/courses/{course_id}/graph/edges/{edge_id}", response_model=KnowledgeEdge)
+def update_edge(course_id: str, edge_id: str, payload: KnowledgeEdgeUpdate) -> KnowledgeEdge:
+    try:
+        return storage.update_edge(course_id, edge_id, payload)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

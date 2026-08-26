@@ -23,6 +23,54 @@ input {
   font: inherit;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+label {
+  color: #374151;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(47, 128, 237, 0.1)),
+    #f4f7fb;
+}
+
+.login-panel {
+  width: min(460px, 100%);
+  padding: 28px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 18px 45px rgba(31, 41, 55, 0.12);
+}
+
+.login-panel h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+.login-panel p {
+  margin: 10px 0 0;
+  color: #5b6472;
+  line-height: 1.7;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
@@ -38,6 +86,18 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+}
+
+.topbar span {
+  color: #5b6472;
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .topbar h1,
@@ -89,7 +149,11 @@ input {
 }
 
 .nav,
-.primary {
+.primary,
+.secondary,
+.danger,
+.ghost,
+.icon-button {
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -116,6 +180,34 @@ input {
   padding: 9px 12px;
   color: #ffffff;
   background: #0f766e;
+}
+
+.secondary {
+  min-height: 38px;
+  padding: 9px 12px;
+  color: #0f766e;
+  background: #d9f4ef;
+}
+
+.danger {
+  min-height: 38px;
+  padding: 9px 12px;
+  color: #ffffff;
+  background: #b42318;
+}
+
+.ghost,
+.icon-button {
+  min-width: 38px;
+  min-height: 38px;
+  color: #374151;
+  background: #eef2f7;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .metric-panel {
@@ -201,7 +293,10 @@ input {
 }
 
 .tool-section input,
-.tool-section textarea {
+.tool-section textarea,
+.tool-section select,
+.login-panel input,
+.login-panel select {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -210,9 +305,15 @@ input {
 }
 
 .tool-section textarea {
-  min-height: 92px;
+  min-height: 74px;
   resize: vertical;
   margin-bottom: 10px;
+}
+
+.tool-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .node-detail,
@@ -241,6 +342,32 @@ input {
   gap: 10px;
 }
 
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.list-item {
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  padding: 9px;
+}
+
+.list-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-item small {
+  color: #6b7280;
+}
+
 @media (max-width: 1100px) {
   .workspace {
     grid-template-columns: 170px minmax(0, 1fr);
@@ -258,6 +385,17 @@ input {
   .panel-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .top-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .course-picker {
+    min-width: 0;
+    width: 100%;
   }
 
   .workspace {

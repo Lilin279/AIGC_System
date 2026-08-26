@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import re
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 
 
-SUPPORTED_FORMATS = {".txt", ".md", ".markdown"}
+SUPPORTED_FORMATS = {".txt", ".md", ".markdown", ".pdf", ".docx", ".pptx"}
 
 
 def decode_bytes(payload: bytes) -> str:
@@ -15,11 +18,46 @@ def decode_bytes(payload: bytes) -> str:
     return payload.decode("utf-8", errors="ignore")
 
 
+def extract_ooxml_text(payload: bytes, prefix: str) -> str:
+    import io
+
+    parts: list[str] = []
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        names = sorted(name for name in archive.namelist() if name.startswith(prefix) and name.endswith(".xml"))
+        for name in names:
+            root = ElementTree.fromstring(archive.read(name))
+            texts = [node.text or "" for node in root.iter() if node.tag.endswith("}t") or node.tag.endswith("}instrText")]
+            joined = " ".join(text.strip() for text in texts if text and text.strip())
+            if joined:
+                parts.append(joined)
+    return "\n".join(parts)
+
+
+def extract_pdf_text(payload: bytes) -> str:
+    import io
+
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(payload))
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception:
+        fallback = decode_bytes(payload)
+        text = re.sub(r"[^\u4e00-\u9fa5A-Za-z0-9，。；：、,.?!?()（）#\s-]", " ", fallback)
+        return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_text_file(filename: str, payload: bytes) -> tuple[str, str]:
     suffix = Path(filename).suffix.lower()
     if suffix not in SUPPORTED_FORMATS:
-        raise ValueError("第一版原型仅支持 TXT、Markdown 文档解析，PDF/DOCX 已预留扩展接口。")
-    return decode_bytes(payload), suffix.lstrip(".")
+        raise ValueError("当前支持 TXT、Markdown、PDF、DOCX、PPTX 课程资料解析。")
+    if suffix in {".txt", ".md", ".markdown"}:
+        return decode_bytes(payload), suffix.lstrip(".")
+    if suffix == ".docx":
+        return extract_ooxml_text(payload, "word/"), "docx"
+    if suffix == ".pptx":
+        return extract_ooxml_text(payload, "ppt/slides/"), "pptx"
+    return extract_pdf_text(payload), "pdf"
 
 
 def clean_sections(text: str) -> list[str]:

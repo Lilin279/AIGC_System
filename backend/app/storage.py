@@ -8,10 +8,12 @@ from pathlib import Path
 from app.models import (
     Course,
     CourseCreate,
+    CourseUpdate,
     DocumentInfo,
     GraphStats,
     KnowledgeEdge,
     KnowledgeEdgeCreate,
+    KnowledgeEdgeUpdate,
     KnowledgeGraph,
     KnowledgeNode,
     KnowledgeNodeCreate,
@@ -92,12 +94,34 @@ def list_courses() -> list[Course]:
 def add_course(payload: CourseCreate) -> Course:
     state = load_state()
     course_id = f"course_{uuid.uuid4().hex[:8]}"
-    course = {"id": course_id, "name": payload.name, "description": payload.description}
+    course = {"id": course_id, "name": payload.name, "description": payload.description, "status": payload.status}
     state["courses"].append(course)
     state["graphs"][course_id] = {"nodes": [], "edges": []}
     state["documents"][course_id] = []
     save_state(state)
     return Course(**course)
+
+
+def update_course(course_id: str, payload: CourseUpdate) -> Course:
+    state = load_state()
+    for index, course in enumerate(state["courses"]):
+        if course["id"] == course_id:
+            updated = {"id": course_id, **payload.model_dump()}
+            state["courses"][index] = updated
+            save_state(state)
+            graph = state["graphs"].get(course_id, {"nodes": [], "edges": []})
+            return Course(**updated, document_count=len(state["documents"].get(course_id, [])), stats=graph_stats(graph))
+    raise KeyError("课程不存在")
+
+
+def delete_course(course_id: str) -> dict:
+    state = load_state()
+    ensure_course(state, course_id)
+    state["courses"] = [course for course in state["courses"] if course["id"] != course_id]
+    state["graphs"].pop(course_id, None)
+    state["documents"].pop(course_id, None)
+    save_state(state)
+    return {"deleted": course_id}
 
 
 def ensure_course(state: dict, course_id: str) -> dict:
@@ -131,6 +155,25 @@ def save_document(course_id: str, filename: str, fmt: str, content: str, raw: by
     state["documents"].setdefault(course_id, []).append(doc)
     save_state(state)
     return DocumentInfo(**{key: doc[key] for key in ("id", "filename", "format", "size", "parsed_chars")})
+
+
+def list_documents(course_id: str) -> list[DocumentInfo]:
+    state = load_state()
+    ensure_course(state, course_id)
+    return [
+        DocumentInfo(**{key: doc[key] for key in ("id", "filename", "format", "size", "parsed_chars")})
+        for doc in state["documents"].get(course_id, [])
+    ]
+
+
+def delete_document(course_id: str, document_id: str) -> dict:
+    state = load_state()
+    ensure_course(state, course_id)
+    state["documents"][course_id] = [
+        doc for doc in state["documents"].get(course_id, []) if doc["id"] != document_id
+    ]
+    save_state(state)
+    return {"deleted": document_id}
 
 
 def extract_course_graph(course_id: str) -> KnowledgeGraph:
@@ -183,6 +226,20 @@ def add_edge(course_id: str, payload: KnowledgeEdgeCreate) -> KnowledgeEdge:
     state["graphs"][course_id]["edges"].append(edge.model_dump())
     save_state(state)
     return edge
+
+
+def update_edge(course_id: str, edge_id: str, payload: KnowledgeEdgeUpdate) -> KnowledgeEdge:
+    state = load_state()
+    ensure_course(state, course_id)
+    edges = state["graphs"][course_id]["edges"]
+    for index, edge in enumerate(edges):
+        if edge["id"] == edge_id:
+            label = payload.label or RELATION_LABELS[payload.relation]
+            updated = KnowledgeEdge(id=edge_id, **payload.model_dump(exclude={"label"}), label=label)
+            edges[index] = updated.model_dump()
+            save_state(state)
+            return updated
+    raise KeyError("关系不存在")
 
 
 def delete_edge(course_id: str, edge_id: str) -> dict:

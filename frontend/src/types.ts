@@ -10,8 +10,24 @@ export interface Course {
   id: string;
   name: string;
   description: string;
+  status: 'draft' | 'published' | 'archived';
   document_count: number;
   stats: GraphStats;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  role: 'admin' | 'teacher' | 'student';
+  organization: string;
+}
+
+export interface DocumentInfo {
+  id: string;
+  filename: string;
+  format: string;
+  size: number;
+  parsed_chars: number;
 }
 
 export interface KnowledgeNode {
