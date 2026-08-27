@@ -15,7 +15,7 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { api } from './api';
+import { api, hasAccessToken, setAccessToken } from './api';
 import GraphView from './components/GraphView';
 import type {
   Course,
@@ -47,8 +47,12 @@ const blankNode: Omit<KnowledgeNode, 'id'> = {
 
 export default function App() {
   const [user, setUser] = useState<User | undefined>();
-  const [loginName, setLoginName] = useState('李老师');
-  const [loginRole, setLoginRole] = useState<User['role']>('teacher');
+  const [authReady, setAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [loginName, setLoginName] = useState('teacher');
+  const [loginPassword, setLoginPassword] = useState('Teacher123!');
+  const [registerForm, setRegisterForm] = useState({ username: '', password: '', name: '', organization: '金扬智能示范学校' });
+  const [authError, setAuthError] = useState('');
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseId, setCourseId] = useState('');
   const [graph, setGraph] = useState<KnowledgeGraph>(emptyGraph);
@@ -76,7 +80,31 @@ export default function App() {
   const refreshCourses = useCallback(async () => {
     const data = await api.listCourses();
     setCourses(data);
-    setCourseId((current) => current || data[0]?.id || '');
+    setCourseId((current) => data.some((course) => course.id === current) ? current : data[0]?.id || '');
+  }, []);
+
+  useEffect(() => {
+    if (!hasAccessToken()) {
+      setAuthReady(true);
+      return;
+    }
+    api.me()
+      .then(setUser)
+      .catch(() => setAccessToken(''))
+      .finally(() => setAuthReady(true));
+  }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(undefined);
+      setCourses([]);
+      setCourseId('');
+      setGraph(emptyGraph);
+      setDocuments([]);
+      setAuthError('登录已失效，请重新登录。');
+    };
+    window.addEventListener('coursegraph:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('coursegraph:unauthorized', handleUnauthorized);
   }, []);
 
   const refreshGraph = useCallback(async (id: string) => {
@@ -137,9 +165,37 @@ export default function App() {
   }, [selectedEdge]);
 
   const login = async () => {
-    const result = await api.login(loginName, loginRole);
-    setUser(result.user);
-    setStatus(`${result.user.name} 已登录。`);
+    setAuthError('');
+    try {
+      const result = await api.login(loginName, loginPassword);
+      setAccessToken(result.token);
+      setUser(result.user);
+      setStatus(`${result.user.name} 已登录。`);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : '登录失败');
+    }
+  };
+
+  const register = async () => {
+    setAuthError('');
+    try {
+      const result = await api.register(registerForm);
+      setAccessToken(result.token);
+      setUser(result.user);
+      setStatus(`${result.user.name}，欢迎开始学习。`);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : '注册失败');
+    }
+  };
+
+  const logout = async () => {
+    await api.logout().catch(() => undefined);
+    setAccessToken('');
+    setUser(undefined);
+    setCourses([]);
+    setCourseId('');
+    setGraph(emptyGraph);
+    setDocuments([]);
   };
 
   const createCourse = async () => {
@@ -162,6 +218,7 @@ export default function App() {
 
   const deleteCourse = async () => {
     if (!selectedCourse) return;
+    if (!window.confirm(`确认删除课程“${selectedCourse.name}”吗？相关资料、图谱和学习进度也会删除。`)) return;
     await api.deleteCourse(selectedCourse.id);
     setCourseId('');
     setGraph(emptyGraph);
@@ -184,6 +241,7 @@ export default function App() {
 
   const deleteDocument = async (documentId: string) => {
     if (!courseId) return;
+    if (!window.confirm('确认删除这份课程资料吗？')) return;
     await api.deleteDocument(courseId, documentId);
     await refreshDocuments(courseId);
     await refreshCourses();
@@ -207,6 +265,7 @@ export default function App() {
 
   const deleteNode = async () => {
     if (!courseId || !selectedNode) return;
+    if (!window.confirm(`确认删除知识点“${selectedNode.name}”及其相关关系吗？`)) return;
     await api.deleteNode(courseId, selectedNode.id);
     setSelectedNode(undefined);
     await refreshGraph(courseId);
@@ -235,6 +294,7 @@ export default function App() {
 
   const deleteEdge = async () => {
     if (!courseId || !selectedEdge) return;
+    if (!window.confirm('确认删除这条知识关系吗？')) return;
     await api.deleteEdge(courseId, selectedEdge.id);
     setSelectedEdgeId('');
     await refreshGraph(courseId);
@@ -243,8 +303,7 @@ export default function App() {
 
   const toggleMastered = async (node: KnowledgeNode) => {
     if (!courseId) return;
-    const updated = { ...node, mastered: !node.mastered };
-    await api.updateNode(courseId, updated);
+    const updated = await api.updateProgress(courseId, node.id, !node.mastered);
     await refreshGraph(courseId);
     setSelectedNode(updated);
   };
@@ -259,11 +318,23 @@ export default function App() {
 
   const recommend = async () => {
     if (!courseId) return;
-    const result = await api.learningPath(courseId, masteredIds);
+    const result = await api.learningPath(courseId);
     setPathResult(result);
     setPathEdgeIds(result.path_edges.map((edge) => edge.id));
     setStatus('已生成下一步学习路径。');
   };
+
+  const withError = useCallback(async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      setStatus(`操作失败：${error instanceof Error ? error.message : '请稍后重试'}`);
+    }
+  }, []);
+
+  if (!authReady) {
+    return <main className="login-page"><p className="auth-loading">正在恢复登录状态...</p></main>;
+  }
 
   if (!user) {
     return (
@@ -274,21 +345,32 @@ export default function App() {
             <h1>AIGC 课程知识图谱学习导航系统</h1>
             <p>面向高校课程建设的知识图谱构建、学习导航与智能问答平台。</p>
           </div>
-          <label>
-            用户名称
-            <input value={loginName} onChange={(event) => setLoginName(event.target.value)} />
-          </label>
-          <label>
-            登录角色
-            <select value={loginRole} onChange={(event) => setLoginRole(event.target.value as User['role'])}>
-              <option value="teacher">教师</option>
-              <option value="student">学生</option>
-              <option value="admin">管理员</option>
-            </select>
-          </label>
-          <button className="primary" onClick={login}>
-            <UserRound size={16} /> 进入系统
-          </button>
+          <div className="auth-tabs" role="tablist" aria-label="账号操作">
+            <button className={authMode === 'login' ? 'active' : ''} onClick={() => { setAuthMode('login'); setAuthError(''); }}>账号登录</button>
+            <button className={authMode === 'register' ? 'active' : ''} onClick={() => { setAuthMode('register'); setAuthError(''); }}>学生注册</button>
+          </div>
+          {authMode === 'login' ? (
+            <>
+              <label>用户名<input autoComplete="username" value={loginName} onChange={(event) => setLoginName(event.target.value)} /></label>
+              <label>密码<input type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && login()} /></label>
+              <button className="primary" onClick={login}><UserRound size={16} /> 登录</button>
+              <div className="demo-accounts">
+                <span>演示账号</span>
+                <button onClick={() => { setLoginName('teacher'); setLoginPassword('Teacher123!'); }}>教师</button>
+                <button onClick={() => { setLoginName('student'); setLoginPassword('Student123!'); }}>学生</button>
+                <button onClick={() => { setLoginName('admin'); setLoginPassword('Admin123!'); }}>管理员</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <label>用户名<input autoComplete="username" value={registerForm.username} onChange={(event) => setRegisterForm({ ...registerForm, username: event.target.value })} /></label>
+              <label>姓名<input value={registerForm.name} onChange={(event) => setRegisterForm({ ...registerForm, name: event.target.value })} /></label>
+              <label>学校 / 机构<input value={registerForm.organization} onChange={(event) => setRegisterForm({ ...registerForm, organization: event.target.value })} /></label>
+              <label>密码<input type="password" autoComplete="new-password" placeholder="至少 8 个字符" value={registerForm.password} onChange={(event) => setRegisterForm({ ...registerForm, password: event.target.value })} /></label>
+              <button className="primary" onClick={register}><UserRound size={16} /> 创建学生账号</button>
+            </>
+          )}
+          {authError && <p className="form-error" role="alert">{authError}</p>}
         </section>
       </main>
     );
@@ -312,7 +394,7 @@ export default function App() {
               ))}
             </select>
           </label>
-          <button className="ghost" onClick={() => setUser(undefined)} title="退出登录">
+          <button className="ghost" onClick={logout} title="退出登录">
             <LogOut size={18} />
           </button>
         </div>
@@ -352,7 +434,10 @@ export default function App() {
               <p className="eyebrow">当前课程</p>
               <h2>{selectedCourse?.name ?? '暂无课程'}</h2>
             </div>
-            <span>{selectedCourse?.description}</span>
+            <div className="course-summary">
+              {selectedCourse && <small className={`status-badge ${selectedCourse.status}`}>{selectedCourse.status === 'published' ? '已发布' : selectedCourse.status === 'archived' ? '已归档' : '草稿'}</small>}
+              <span>{selectedCourse?.description ?? (user.role === 'student' ? '当前暂无已发布课程。' : '请开设一门新课程。')}</span>
+            </div>
           </div>
           <GraphView graph={graph} selectedNodeId={selectedNode?.id} pathEdgeIds={pathEdgeIds} onSelectNode={setSelectedNode} />
         </section>
@@ -361,12 +446,12 @@ export default function App() {
           {user.role === 'student' ? (
             <StudentPanel
               selectedNode={selectedNode}
-              toggleMastered={toggleMastered}
+              toggleMastered={(node) => withError(() => toggleMastered(node))}
               question={question}
               setQuestion={setQuestion}
-              ask={ask}
+              ask={() => withError(ask)}
               qaResult={qaResult}
-              recommend={recommend}
+              recommend={() => withError(recommend)}
               pathResult={pathResult}
             />
           ) : (
@@ -374,26 +459,26 @@ export default function App() {
               selectedCourse={selectedCourse}
               courseForm={courseForm}
               setCourseForm={setCourseForm}
-              createCourse={createCourse}
-              updateCourse={updateCourse}
-              deleteCourse={deleteCourse}
+              createCourse={() => withError(createCourse)}
+              updateCourse={() => withError(updateCourse)}
+              deleteCourse={() => withError(deleteCourse)}
               documents={documents}
-              uploadDocument={uploadDocument}
-              deleteDocument={deleteDocument}
+              uploadDocument={(file) => withError(() => uploadDocument(file))}
+              deleteDocument={(id) => withError(() => deleteDocument(id))}
               graph={graph}
               selectedNode={selectedNode}
               nodeForm={nodeForm}
               setNodeForm={setNodeForm}
               newNode={newNode}
-              saveNode={saveNode}
-              deleteNode={deleteNode}
+              saveNode={() => withError(saveNode)}
+              deleteNode={() => withError(deleteNode)}
               selectedEdgeId={selectedEdgeId}
               setSelectedEdgeId={setSelectedEdgeId}
               edgeForm={edgeForm}
               setEdgeForm={setEdgeForm}
               newEdge={newEdge}
-              saveEdge={saveEdge}
-              deleteEdge={deleteEdge}
+              saveEdge={() => withError(saveEdge)}
+              deleteEdge={() => withError(deleteEdge)}
             />
           )}
         </aside>

@@ -1,23 +1,50 @@
-import type { Course, DocumentInfo, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, User } from './types';
+import type { AuthResult, Course, DocumentInfo, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, User } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000';
+const TOKEN_KEY = 'coursegraph_access_token';
+let accessToken = localStorage.getItem(TOKEN_KEY) ?? '';
+
+export function setAccessToken(token: string) {
+  accessToken = token;
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export function hasAccessToken() {
+  return Boolean(accessToken);
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, init);
+  const headers = new Headers(init?.headers);
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `HTTP ${response.status}`);
+    const payload = await response.json().catch(() => undefined) as { detail?: string } | undefined;
+    if (response.status === 401) {
+      setAccessToken('');
+      window.dispatchEvent(new Event('coursegraph:unauthorized'));
+    }
+    throw new Error(payload?.detail || `请求失败（${response.status}）`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
 export const api = {
-  login: (username: string, role: User['role']) =>
-    request<{ token: string; user: User }>('/api/auth/login', {
+  login: (username: string, password: string) =>
+    request<AuthResult>('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password: 'demo', role }),
+      body: JSON.stringify({ username, password }),
     }),
+  register: (payload: { username: string; password: string; name: string; organization: string }) =>
+    request<AuthResult>('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  me: () => request<User>('/api/auth/me'),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   listCourses: () => request<Course[]>('/api/courses'),
   createCourse: (course: Pick<Course, 'name' | 'description' | 'status'>) =>
     request<Course>('/api/courses', {
@@ -61,6 +88,12 @@ export const api = {
       }),
     }),
   deleteNode: (courseId: string, nodeId: string) => request(`/api/courses/${courseId}/graph/nodes/${nodeId}`, { method: 'DELETE' }),
+  updateProgress: (courseId: string, nodeId: string, mastered: boolean) =>
+    request<KnowledgeNode>(`/api/courses/${courseId}/progress/${nodeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mastered }),
+    }),
   addEdge: (courseId: string, edge: Omit<KnowledgeEdge, 'id'>) =>
     request<KnowledgeEdge>(`/api/courses/${courseId}/graph/edges`, {
       method: 'POST',
@@ -80,10 +113,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
     }),
-  learningPath: (courseId: string, masteredNodeIds: string[]) =>
+  learningPath: (courseId: string) =>
     request<LearningPathResult>(`/api/courses/${courseId}/learning-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mastered_node_ids: masteredNodeIds }),
+      body: JSON.stringify({}),
     }),
 };

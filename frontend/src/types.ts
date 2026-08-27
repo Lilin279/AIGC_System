@@ -11,6 +11,8 @@ export interface Course {
   name: string;
   description: string;
   status: 'draft' | 'published' | 'archived';
+  owner_id: string;
+  owner_name: string;
   document_count: number;
   stats: GraphStats;
 }
@@ -28,6 +30,13 @@ export interface DocumentInfo {
   format: string;
   size: number;
   parsed_chars: number;
+  created_at: string;
+}
+
+export interface AuthResult {
+  token: string;
+  user: User;
+  expires_at: string;
 }
 
 export interface KnowledgeNode {

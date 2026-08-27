@@ -4,13 +4,13 @@
       "id": "python_intro",
       "name": "Python 程序设计基础",
       "description": "面向零基础学生的程序设计入门课程，用于演示知识抽取、图谱导航与学习路径推荐。",
-      "status": "draft"
+      "status": "published"
     },
     {
       "id": "database_systems",
       "name": "数据库系统原理",
       "description": "覆盖关系模型、SQL、事务、索引和查询优化的数据库基础课程。",
-      "status": "draft"
+      "status": "published"
     }
   ]
 }

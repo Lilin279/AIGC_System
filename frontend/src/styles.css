@@ -71,6 +71,58 @@ label {
   line-height: 1.7;
 }
 
+.auth-loading {
+  color: #4b5563;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.auth-tabs button {
+  border: 0;
+  border-radius: 0;
+  color: #4b5563;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.auth-tabs button.active {
+  color: #ffffff;
+  background: #0f766e;
+}
+
+.demo-accounts {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, auto);
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.demo-accounts button {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #365f91;
+  background: #eef4ff;
+  cursor: pointer;
+}
+
+.login-panel .form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #b42318;
+  color: #8f1d15;
+  background: #fff1f0;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
@@ -253,6 +305,41 @@ label {
   line-height: 1.6;
 }
 
+.course-summary {
+  max-width: 48%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.course-summary span {
+  max-width: none;
+}
+
+.status-badge {
+  flex: 0 0 auto;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-badge.published {
+  color: #067647;
+  background: #dcfae6;
+}
+
+.status-badge.draft {
+  color: #6941c6;
+  background: #f4f3ff;
+}
+
+.status-badge.archived {
+  color: #475467;
+  background: #eaecf0;
+}
+
 .graph-canvas {
   flex: 1;
   min-height: 620px;
@@ -409,6 +496,11 @@ label {
 
   .panel-heading span {
     max-width: none;
+  }
+
+  .course-summary {
+    max-width: none;
+    justify-content: flex-start;
   }
 
   .graph-canvas {

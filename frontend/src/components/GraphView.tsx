@@ -76,15 +76,22 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
       behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element'],
     });
 
-    instance.render();
     instance.on?.('node:click', (event: any) => {
       const id = event?.target?.id ?? event?.item?.getID?.();
       const node = graph.nodes.find((item) => item.id === id);
       if (node) onSelectNode(node);
     });
 
+    let renderFinished = false;
+    let disposed = false;
+    void instance.render().then(() => {
+      renderFinished = true;
+      if (disposed) instance.destroy();
+    });
+
     return () => {
-      instance.destroy();
+      disposed = true;
+      if (renderFinished) instance.destroy();
     };
   }, [graph, onSelectNode, pathEdgeIds, selectedNodeId]);
 
