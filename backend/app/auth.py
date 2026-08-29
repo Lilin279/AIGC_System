@@ -56,10 +56,14 @@ def user_from_token(token: str) -> User | None:
         connection.execute("DELETE FROM sessions WHERE expires_at <= ?", (now,))
         row = connection.execute(
             """
-            SELECT users.id, users.name, users.role, users.organization
+            SELECT users.id, users.name, users.role, users.organization, users.username,
+                   users.email, users.phone, users.avatar_url, users.account_status,
+                   users.must_change_password, users.student_no, users.department,
+                   users.title, users.rejection_reason
             FROM sessions
             JOIN users ON users.id = sessions.user_id
-            WHERE sessions.token_hash = ? AND sessions.expires_at > ? AND users.is_active = 1
+            WHERE sessions.token_hash = ? AND sessions.expires_at > ?
+              AND users.is_active = 1 AND users.account_status != 'disabled'
             """,
             (_token_hash(token), now),
         ).fetchone()

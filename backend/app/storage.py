@@ -21,6 +21,7 @@ from app.models import (
     KnowledgeNode,
     KnowledgeNodeCreate,
     RegisterRequest,
+    SourceReference,
     User,
 )
 from app.services.extractor import RELATION_LABELS, build_mock_graph
@@ -60,6 +61,8 @@ def init_store() -> None:
             )
         if connection.execute("SELECT COUNT(*) FROM courses").fetchone()[0] == 0:
             _seed_courses(connection)
+    from app.platform import initialize_extended_data
+    initialize_extended_data()
 
 
 def _seed_courses(connection: sqlite3.Connection) -> None:
@@ -103,8 +106,8 @@ def register_student(payload: RegisterRequest) -> User:
     if not name:
         raise ValueError("姓名不能为空")
     user = User(
-        id=f"user_{uuid.uuid4().hex[:12]}", name=name, role="student",
-        organization=payload.organization.strip() or "金扬智能示范学校",
+        id=f"user_{uuid.uuid4().hex[:12]}", username=username, name=name, role="student",
+        organization=payload.organization.strip() or "金扬智能示范学校", account_status="active",
     )
     try:
         with connect() as connection:
@@ -123,28 +126,51 @@ def register_student(payload: RegisterRequest) -> User:
 def authenticate(username: str, password: str) -> User | None:
     with connect() as connection:
         row = connection.execute(
-            "SELECT id, name, role, organization, password_hash FROM users WHERE username = ? AND is_active = 1",
+            """
+            SELECT id, name, role, organization, username, email, phone, avatar_url,
+                   account_status, must_change_password, student_no, department, title,
+                   rejection_reason, password_hash
+            FROM users WHERE username = ? AND is_active = 1 AND account_status != 'disabled'
+            """,
             (username.strip().lower(),),
         ).fetchone()
     if not row or not verify_password(password, row["password_hash"]):
         return None
-    return User(id=row["id"], name=row["name"], role=row["role"], organization=row["organization"])
+    values = dict(row)
+    values.pop("password_hash")
+    values["must_change_password"] = bool(values["must_change_password"])
+    return User(**values)
 
 
 def list_courses(user: User) -> list[Course]:
     where = ""
     parameters: tuple[str, ...] = ()
     if user.role == "student":
-        where = "WHERE c.status = 'published'"
-    elif user.role == "teacher":
-        where = "WHERE c.owner_id = ?"
+        where = """
+        WHERE c.status = 'published' AND EXISTS (
+          SELECT 1 FROM classrooms cl JOIN enrollments en ON en.classroom_id = cl.id
+          WHERE cl.course_id = c.id AND cl.status = 'active'
+            AND en.student_id = ? AND en.status = 'active'
+        )
+        """
         parameters = (user.id,)
+    elif user.role == "teacher":
+        where = """
+        WHERE c.owner_id = ? OR EXISTS (
+          SELECT 1 FROM classrooms cl JOIN class_teachers ct ON ct.classroom_id = cl.id
+          WHERE cl.course_id = c.id AND ct.teacher_id = ?
+        )
+        """
+        parameters = (user.id, user.id)
     query = f"""
         SELECT c.*, u.name AS owner_name,
             (SELECT COUNT(*) FROM documents d WHERE d.course_id = c.id) AS document_count,
             (SELECT COUNT(*) FROM nodes n WHERE n.course_id = c.id) AS node_count,
             (SELECT COUNT(*) FROM edges e WHERE e.course_id = c.id) AS edge_count,
             (SELECT COUNT(DISTINCT e.relation) FROM edges e WHERE e.course_id = c.id) AS relation_type_count
+            ,(SELECT COUNT(*) FROM classrooms cl WHERE cl.course_id = c.id) AS classroom_count
+            ,(SELECT COUNT(*) FROM enrollments en JOIN classrooms cl ON cl.id = en.classroom_id
+              WHERE cl.course_id = c.id AND en.status = 'active') AS student_count
         FROM courses c JOIN users u ON u.id = c.owner_id
         {where}
         ORDER BY c.updated_at DESC, c.created_at DESC
@@ -177,7 +203,7 @@ def add_course(payload: CourseCreate, user: User) -> Course:
 
 
 def update_course(course_id: str, payload: CourseUpdate, user: User) -> Course:
-    _assert_manage_course(course_id, user)
+    _assert_own_course(course_id, user)
     if not payload.name.strip():
         raise ValueError("课程名称不能为空")
     if payload.status == "published":
@@ -191,7 +217,7 @@ def update_course(course_id: str, payload: CourseUpdate, user: User) -> Course:
 
 
 def delete_course(course_id: str, user: User) -> dict:
-    _assert_manage_course(course_id, user)
+    _assert_own_course(course_id, user)
     with connect() as connection:
         connection.execute("DELETE FROM courses WHERE id = ?", (course_id,))
     course_upload_dir = UPLOAD_DIR / course_id
@@ -222,9 +248,33 @@ def get_graph(course_id: str, user: User) -> KnowledgeGraph:
             "SELECT id, source, target, relation, label FROM edges WHERE course_id = ? ORDER BY created_at, id",
             (course_id,),
         ).fetchall()
+        node_sources = connection.execute(
+            """
+            SELECT ns.node_id, ns.document_id, ns.source_type, ns.source_excerpt, ns.page_no,
+                   ns.confidence, ns.reason, COALESCE(d.filename, '') AS filename
+            FROM node_sources ns
+            LEFT JOIN documents d ON d.id = ns.document_id
+            WHERE ns.node_id IN (SELECT id FROM nodes WHERE course_id = ?)
+            ORDER BY ns.confidence DESC
+            """,
+            (course_id,),
+        ).fetchall()
+        edge_sources = connection.execute(
+            """
+            SELECT es.edge_id, es.document_id, es.source_type, '' AS source_excerpt, es.page_no,
+                   es.confidence, es.reason, COALESCE(d.filename, '') AS filename
+            FROM edge_sources es
+            LEFT JOIN documents d ON d.id = es.document_id
+            WHERE es.edge_id IN (SELECT id FROM edges WHERE course_id = ?)
+            ORDER BY es.confidence DESC
+            """,
+            (course_id,),
+        ).fetchall()
+    node_source_map = _source_map(node_sources, "node_id")
+    edge_source_map = _source_map(edge_sources, "edge_id")
     return KnowledgeGraph(
-        nodes=[_node_from_row(row) for row in nodes],
-        edges=[KnowledgeEdge(**dict(row)) for row in edges],
+        nodes=[_node_from_row(row).model_copy(update={"source_refs": node_source_map.get(row["id"], [])}) for row in nodes],
+        edges=[KnowledgeEdge(**dict(row), source_refs=edge_source_map.get(row["id"], [])) for row in edges],
     )
 
 
@@ -251,7 +301,11 @@ def list_documents(course_id: str, user: User) -> list[DocumentInfo]:
     _assert_read_course(course_id, user)
     with connect() as connection:
         rows = connection.execute(
-            "SELECT id, filename, format, size, parsed_chars, created_at FROM documents WHERE course_id = ? ORDER BY created_at DESC",
+            """
+            SELECT d.id, d.filename, d.format, d.size, d.parsed_chars, d.created_at, d.status,
+              (SELECT COUNT(DISTINCT ns.node_id) FROM node_sources ns WHERE ns.document_id = d.id) AS source_node_count
+            FROM documents d WHERE d.course_id = ? AND d.status = 'active' ORDER BY d.created_at DESC
+            """,
             (course_id,),
         ).fetchall()
     return [DocumentInfo(**dict(row)) for row in rows]
@@ -294,6 +348,10 @@ def add_node(course_id: str, payload: KnowledgeNodeCreate, user: User) -> Knowle
     node = KnowledgeNode(id=f"node_{uuid.uuid4().hex[:10]}", **payload.model_dump())
     with connect() as connection:
         _insert_node(connection, course_id, node)
+        connection.execute(
+            "INSERT INTO node_sources(node_id, document_id, source_type, manual_override) VALUES (?, NULL, 'manual', 1)",
+            (node.id,),
+        )
     return node.model_copy(update={"mastered": False})
 
 
@@ -314,6 +372,12 @@ def update_node(course_id: str, node_id: str, payload: KnowledgeNodeCreate, user
         )
         if cursor.rowcount == 0:
             raise KeyError("知识点不存在")
+        connection.execute("UPDATE node_sources SET manual_override = 1 WHERE node_id = ?", (node_id,))
+        connection.execute("DELETE FROM node_sources WHERE node_id = ? AND document_id IS NULL", (node_id,))
+        connection.execute(
+            "INSERT INTO node_sources(node_id, document_id, source_type, manual_override) VALUES (?, NULL, 'manual', 1)",
+            (node_id,),
+        )
     return KnowledgeNode(id=node_id, **payload.model_dump()).model_copy(update={"mastered": False})
 
 
@@ -337,6 +401,10 @@ def add_edge(course_id: str, payload: KnowledgeEdgeCreate, user: User) -> Knowle
     try:
         with connect() as connection:
             _insert_edge(connection, course_id, edge)
+            connection.execute(
+                "INSERT INTO edge_sources(edge_id, document_id, source_type, manual_override) VALUES (?, NULL, 'manual', 1)",
+                (edge.id,),
+            )
     except sqlite3.IntegrityError as exc:
         raise ValueError("相同知识点之间已存在该类型关系") from exc
     return edge
@@ -354,6 +422,12 @@ def update_edge(course_id: str, edge_id: str, payload: KnowledgeEdgeUpdate, user
             )
             if cursor.rowcount == 0:
                 raise KeyError("关系不存在")
+            connection.execute("UPDATE edge_sources SET manual_override = 1 WHERE edge_id = ?", (edge_id,))
+            connection.execute("DELETE FROM edge_sources WHERE edge_id = ? AND document_id IS NULL", (edge_id,))
+            connection.execute(
+                "INSERT INTO edge_sources(edge_id, document_id, source_type, manual_override) VALUES (?, NULL, 'manual', 1)",
+                (edge_id,),
+            )
     except sqlite3.IntegrityError as exc:
         raise ValueError("相同知识点之间已存在该类型关系") from exc
     return KnowledgeEdge(id=edge_id, source=payload.source, target=payload.target, relation=payload.relation, label=label)
@@ -405,6 +479,8 @@ def _course_from_row(row: sqlite3.Row) -> Course:
         id=row["id"], name=row["name"], description=row["description"], status=row["status"],
         owner_id=row["owner_id"], owner_name=row["owner_name"], document_count=row["document_count"],
         stats=GraphStats(nodes=row["node_count"], edges=row["edge_count"], relation_types=row["relation_type_count"]),
+        classroom_count=row["classroom_count"], student_count=row["student_count"],
+        source_incomplete=bool(row["source_incomplete"]),
     )
 
 
@@ -415,10 +491,27 @@ def _node_from_row(row: sqlite3.Row | dict) -> KnowledgeNode:
     )
 
 
+def _source_map(rows: list[sqlite3.Row], owner_field: str) -> dict[str, list[SourceReference]]:
+    result: dict[str, list[SourceReference]] = {}
+    for row in rows:
+        result.setdefault(row[owner_field], []).append(
+            SourceReference(
+                document_id=row["document_id"] or "", filename=row["filename"], source_type=row["source_type"],
+                page_no=row["page_no"], excerpt=row["source_excerpt"], confidence=float(row["confidence"] or 0),
+                reason=row["reason"],
+            )
+        )
+    return result
+
+
 def _document_by_id(course_id: str, document_id: str) -> DocumentInfo:
     with connect() as connection:
         row = connection.execute(
-            "SELECT id, filename, format, size, parsed_chars, created_at FROM documents WHERE id = ? AND course_id = ?",
+            """
+            SELECT d.id, d.filename, d.format, d.size, d.parsed_chars, d.created_at, d.status,
+              (SELECT COUNT(DISTINCT ns.node_id) FROM node_sources ns WHERE ns.document_id = d.id) AS source_node_count
+            FROM documents d WHERE d.id = ? AND d.course_id = ?
+            """,
             (document_id, course_id),
         ).fetchone()
     if not row:
@@ -460,7 +553,16 @@ def _assert_read_course(course_id: str, user: User) -> None:
     if user.role == "teacher" and row["owner_id"] == user.id:
         return
     if user.role == "student" and row["status"] == "published":
-        return
+        with connect() as connection:
+            enrolled = connection.execute(
+                """
+                SELECT 1 FROM classrooms cl JOIN enrollments en ON en.classroom_id = cl.id
+                WHERE cl.course_id = ? AND cl.status = 'active' AND en.student_id = ? AND en.status = 'active'
+                """,
+                (course_id, user.id),
+            ).fetchone()
+        if enrolled:
+            return
     raise PermissionError("无权访问该课程")
 
 
@@ -468,10 +570,27 @@ def _assert_manage_course(course_id: str, user: User) -> None:
     _require_role(user, "teacher", "admin")
     with connect() as connection:
         row = connection.execute("SELECT owner_id FROM courses WHERE id = ?", (course_id,)).fetchone()
+        collaborator = connection.execute(
+            """
+            SELECT 1 FROM classrooms cl JOIN class_teachers ct ON ct.classroom_id = cl.id
+            WHERE cl.course_id = ? AND ct.teacher_id = ? AND ct.can_edit_course = 1
+            """,
+            (course_id, user.id),
+        ).fetchone()
+    if not row:
+        raise KeyError("课程不存在")
+    if user.role != "admin" and row["owner_id"] != user.id and not collaborator:
+        raise PermissionError("只能管理自己开设或获授权编辑的课程")
+
+
+def _assert_own_course(course_id: str, user: User) -> None:
+    _require_role(user, "teacher", "admin")
+    with connect() as connection:
+        row = connection.execute("SELECT owner_id FROM courses WHERE id = ?", (course_id,)).fetchone()
     if not row:
         raise KeyError("课程不存在")
     if user.role != "admin" and row["owner_id"] != user.id:
-        raise PermissionError("只能管理自己开设的课程")
+        raise PermissionError("只有课程主教师可以修改课程信息或归档课程")
 
 
 def _require_role(user: User, *roles: str) -> None:
