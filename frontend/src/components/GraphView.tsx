@@ -17,6 +17,16 @@ const relationColor: Record<string, string> = {
 
 export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelectNode }: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const graphRef = useRef<G6Graph | null>(null);
+  const graphDataRef = useRef(graph);
+  const selectedNodeIdRef = useRef(selectedNodeId);
+  const pathEdgeIdsRef = useRef(pathEdgeIds);
+  const onSelectNodeRef = useRef(onSelectNode);
+
+  graphDataRef.current = graph;
+  selectedNodeIdRef.current = selectedNodeId;
+  pathEdgeIdsRef.current = pathEdgeIds;
+  onSelectNodeRef.current = onSelectNode;
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -25,27 +35,7 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
       container: containerRef.current,
       autoFit: 'view',
       autoResize: true,
-      data: {
-        nodes: graph.nodes.map((node) => ({
-          id: node.id,
-          data: {
-            label: node.name,
-            type: node.type,
-            mastered: node.mastered,
-            selected: node.id === selectedNodeId,
-          },
-        })),
-        edges: graph.edges.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          data: {
-            label: edge.label,
-            relation: edge.relation,
-            inPath: pathEdgeIds.includes(edge.id),
-          },
-        })),
-      },
+      data: toG6Data(graphDataRef.current, selectedNodeIdRef.current, pathEdgeIdsRef.current),
       layout: {
         type: 'force',
         preventOverlap: true,
@@ -75,18 +65,85 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
       },
       behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element'],
     });
+    graphRef.current = instance;
 
     instance.render();
     instance.on?.('node:click', (event: any) => {
       const id = event?.target?.id ?? event?.item?.getID?.();
-      const node = graph.nodes.find((item) => item.id === id);
-      if (node) onSelectNode(node);
+      const node = graphDataRef.current.nodes.find((item) => item.id === id);
+      if (node) onSelectNodeRef.current(node);
     });
 
     return () => {
       instance.destroy();
+      graphRef.current = null;
     };
-  }, [graph, onSelectNode, pathEdgeIds, selectedNodeId]);
+  }, []);
+
+  useEffect(() => {
+    const instance = graphRef.current;
+    if (!instance) return;
+
+    // Synchronize changed graph data without calling layout. Existing node
+    // positions remain in G6's model, so adding a node or changing mastered
+    // status does not restart the force-directed animation.
+    instance.stopLayout();
+    instance.setData(toG6Data(graph, selectedNodeIdRef.current, pathEdgeIdsRef.current));
+    void instance.draw();
+  }, [graph]);
+
+  useEffect(() => {
+    const instance = graphRef.current;
+    if (!instance) return;
+
+    // Update only node data. G6's draw() does not execute layout, so the
+    // force-directed positions remain unchanged when selection changes.
+    instance.stopLayout();
+    instance.updateNodeData(
+      instance.getNodeData().map((node) => ({
+        id: node.id,
+        data: { selected: node.id === selectedNodeId },
+      })),
+    );
+    void instance.draw();
+  }, [selectedNodeId]);
+
+  useEffect(() => {
+    const instance = graphRef.current;
+    if (!instance) return;
+
+    instance.updateEdgeData(
+      instance.getEdgeData().map((edge) => ({
+        id: edge.id,
+        data: { inPath: edge.id != null && pathEdgeIds.includes(String(edge.id)) },
+      })),
+    );
+    void instance.draw();
+  }, [pathEdgeIds]);
 
   return <div ref={containerRef} className="graph-canvas" />;
+}
+
+function toG6Data(graph: KnowledgeGraph, selectedNodeId?: string, pathEdgeIds: string[] = []) {
+  return {
+    nodes: graph.nodes.map((node) => ({
+      id: node.id,
+      data: {
+        label: node.name,
+        type: node.type,
+        mastered: node.mastered,
+        selected: node.id === selectedNodeId,
+      },
+    })),
+    edges: graph.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      data: {
+        label: edge.label,
+        relation: edge.relation,
+        inPath: pathEdgeIds.includes(edge.id),
+      },
+    })),
+  };
 }
