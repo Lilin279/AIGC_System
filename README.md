@@ -15,7 +15,7 @@
 - SQLite FTS5 中文 2/3-gram 索引配合 BM25 排序、知识点匹配和图谱邻居扩展，形成可溯源 GraphRAG。
 - 管理员独立控制台：教师审核、全校用户/班级/课程、两步批量导入、工单和审计日志。
 - 个人资料、头像、密码、工单附件、站内通知；导入账号首次登录强制改密。
-- SQLite 保存业务数据；已确认图谱可选同步 Neo4j，连接失败自动降级。
+- SQLite 保存业务数据；Neo4j 保存已确认图谱并实际参与前置关系查询和 GraphRAG 两跳邻居召回，连接失败自动降级。
 
 ## 本地启动
 
@@ -50,6 +50,16 @@ docker compose up --build
 ```powershell
 docker compose --profile neo4j up --build
 ```
+
+## Neo4j 图数据库
+
+本地启动后端时，`NEO4J_HTTP_URL` 应指向宿主机可访问的 Neo4j HTTP 地址（通常为 `http://localhost:7474`）；后端运行在 Compose 中时应使用 `http://neo4j:7474`。可通过以下接口验收：
+
+- `GET /api/integrations`：执行真实认证和 Cypher 查询，返回连接、节点/关系计数和同步状态。
+- `POST /api/courses/{course_id}/graph/sync`：教师同步当前课程，并核对 SQLite/Neo4j 的节点数、关系数和版本。
+- `POST /api/admin/integrations/neo4j/sync`：管理员全量同步所有课程。
+
+审核、恢复、手工编辑和课件回滚都会自动同步。失败记录保存在 SQLite，服务重启后自动补偿；学习路径返回模式含 `+neo4j` 时表示前置关系来自 Neo4j，问答证据中的“Neo4j 图谱邻居扩展”表示已使用两跳图召回。
 
 ## DeepSeek
 

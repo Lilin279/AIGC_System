@@ -1,6 +1,6 @@
 import type {
   AIStatus, AuthResult, Classroom, Course, DashboardStats, DiagnosisResult, DocumentImpact, DocumentInfo,
-  ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview,
+  ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
   KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, Ticket, User,
 } from './types';
 
@@ -40,6 +40,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 
 export const api = {
   aiStatus: () => request<AIStatus>('/api/ai/status'),
+  integrations: () => request<IntegrationStatus>('/api/integrations'),
   login: (username: string, password: string) => request<AuthResult>('/api/auth/login', json('POST', { username, password })),
   registerStudent: (payload: object) => request<AuthResult>('/api/auth/register', json('POST', payload)),
   registerTeacher: (payload: object) => request<AuthResult>('/api/auth/register/teacher', json('POST', payload)),
@@ -72,6 +73,7 @@ export const api = {
   rejectVersion: (courseId: string, versionId: string) => request<GraphVersion>(`/api/courses/${courseId}/graph/versions/${versionId}/reject`, { method: 'POST' }),
   restoreVersion: (courseId: string, versionId: string) => request<GraphVersion>(`/api/courses/${courseId}/graph/versions/${versionId}/restore`, { method: 'POST' }),
   graphQuality: (courseId: string) => request<GraphQuality>(`/api/courses/${courseId}/graph/quality`),
+  syncNeo4j: (courseId: string) => request<{ synced: boolean; message: string }>(`/api/courses/${courseId}/graph/sync`, { method: 'POST' }),
   addNode: (courseId: string, node: object) => request<KnowledgeNode>(`/api/courses/${courseId}/graph/nodes`, json('POST', node)),
   updateNode: (courseId: string, node: KnowledgeNode) => request<KnowledgeNode>(`/api/courses/${courseId}/graph/nodes/${node.id}`, json('PUT', node)),
   deleteNode: (courseId: string, nodeId: string) => request(`/api/courses/${courseId}/graph/nodes/${nodeId}`, { method: 'DELETE' }),

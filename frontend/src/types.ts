@@ -110,6 +110,21 @@ export interface AIStatus {
   capabilities: string[];
 }
 
+export interface Neo4jStatus {
+  enabled: boolean;
+  available: boolean;
+  database: string;
+  message: string;
+  nodes?: number;
+  edges?: number;
+  sync: { synced: number; pending: number; syncing: number; failed: number };
+}
+
+export interface IntegrationStatus {
+  aigc: { mode: string };
+  neo4j: Neo4jStatus;
+}
+
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] }
 
 export interface ExtractionJob {

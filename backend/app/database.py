@@ -299,6 +299,20 @@ CREATE TABLE IF NOT EXISTS ai_usage_logs (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS neo4j_sync_state (
+    course_id TEXT PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    version_id TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'syncing', 'synced', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    sqlite_nodes INTEGER NOT NULL DEFAULT 0,
+    sqlite_edges INTEGER NOT NULL DEFAULT 0,
+    neo4j_nodes INTEGER NOT NULL DEFAULT 0,
+    neo4j_edges INTEGER NOT NULL DEFAULT 0,
+    message TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    synced_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_classrooms_course ON classrooms(course_id, status);
 CREATE INDEX IF NOT EXISTS idx_class_teachers_teacher ON class_teachers(teacher_id, classroom_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id, status);
@@ -309,6 +323,7 @@ CREATE INDEX IF NOT EXISTS idx_versions_course ON graph_versions(course_id, vers
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_neo4j_sync_status ON neo4j_sync_state(status, updated_at);
 """
 
 
@@ -377,6 +392,7 @@ def initialize_schema() -> None:
         except sqlite3.OperationalError:
             pass
         connection.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (4)")
+        connection.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (5)")
         connection.execute("PRAGMA optimize")
 
 

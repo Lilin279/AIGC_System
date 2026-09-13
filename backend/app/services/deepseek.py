@@ -87,21 +87,52 @@ def status() -> dict[str, Any]:
     }
 
 
-def extract_graph(course_name: str, documents: list[dict]) -> KnowledgeGraph:
+def extract_graph(
+    course_name: str, documents: list[dict], warnings: list[str] | None = None,
+) -> KnowledgeGraph:
     if not configured():
         return build_mock_graph(course_name, documents)
     corpus = _build_corpus(documents)
     parsed = _request_extracted_graph(course_name, corpus, repair=False)
+    if not _to_graph(course_name, parsed, documents).nodes:
+        raise ValueError("DeepSeek 未抽取到有效知识点，请检查课件内容后重试")
     if _needs_repair(parsed):
-        repaired = _request_extracted_graph(
-            course_name,
-            corpus,
-            repair=True,
-            current=json.dumps(parsed.model_dump(), ensure_ascii=False)[:18000],
-        )
-        if _graph_completeness(repaired) > _graph_completeness(parsed):
-            parsed = repaired
+        # 补全是增量操作；可选调用失败不能丢弃首次已通过结构校验的结果。
+        try:
+            repaired = _request_extracted_graph(
+                course_name, corpus, repair=True,
+                current=json.dumps({
+                    "nodes": [node.name for node in parsed.nodes],
+                    "edges": [
+                        {"source": edge.source, "target": edge.target, "relation": edge.relation}
+                        for edge in parsed.edges
+                    ],
+                }, ensure_ascii=False, separators=(",", ":")),
+            )
+            parsed = _merge_extracted_graphs(parsed, repaired)
+        except ValueError:
+            if warnings is not None:
+                warnings.append("自动补全未完成，已保留首次有效抽取结果；请审核数量、关系和来源后再应用")
     return _to_graph(course_name, parsed, documents)
+
+
+def _merge_extracted_graphs(base: ExtractedGraph, addition: ExtractedGraph) -> ExtractedGraph:
+    nodes = list(base.nodes)
+    names = {_normalized_name(node.name) for node in nodes}
+    for node in addition.nodes:
+        key = _normalized_name(node.name)
+        if key and key not in names:
+            nodes.append(node)
+            names.add(key)
+    edges = list(base.edges)
+    keys = {(_normalized_name(edge.source), _normalized_name(edge.target), edge.relation) for edge in edges}
+    for edge in addition.edges:
+        source, target = _normalized_name(edge.source), _normalized_name(edge.target)
+        key = (source, target, edge.relation)
+        if source in names and target in names and source != target and edge.relation in RELATION_LABELS and key not in keys:
+            edges.append(edge)
+            keys.add(key)
+    return ExtractedGraph(nodes=nodes, edges=edges)
 
 
 def answer_with_evidence(question: str, evidence: list[dict]) -> str:
@@ -187,7 +218,8 @@ def offline_exercises(nodes: list[KnowledgeNode], evidence: list[dict]) -> list[
 
 def _request_extracted_graph(course_name: str, corpus: str, repair: bool, current: str = "") -> ExtractedGraph:
     task = (
-        "上次输出未达到至少20个知识点或三类关系。请在不编造资料外事实的前提下补全，并重新输出完整图谱。"
+        "已有图谱未达到20个知识点或三类关系。仅返回缺失的节点和关系，不要重复输出已有内容。"
+        "补充关系可引用已有知识点名称。总节点数以20个为目标，资料不支持时不要编造。"
         if repair else "请抽取20个有教学价值的知识点并建立关系。"
     )
     payload = _chat_payload(
@@ -198,10 +230,10 @@ def _request_extracted_graph(course_name: str, corpus: str, repair: bool, curren
 要求：
 1. 类型使用 chapter/concept/skill/formula/example/project。
 2. 关系必须覆盖 contains、prerequisite、related，source/target 使用知识点名称。
-3. 每个节点与关系提供 sources，包含 document_id、filename、page_no、excerpt、confidence、reason。
+3. 每个节点与关系提供一个 sources，包含 document_id、page_no、excerpt、confidence；filename 由系统恢复，无需输出。
 4. excerpt 必须从原文直接截取；重复概念合并。
-5. definition 不超过80字，example 可为空，excerpt 不超过100字，reason 不超过30字；每项保留一个最直接来源。
-6. 输出 json 格式：{{"nodes":[{{"name":"","type":"concept","definition":"","example":"","sources":[{{"document_id":"","filename":"","page_no":1,"excerpt":"","confidence":0.9,"reason":""}}]}}],"edges":[{{"source":"","target":"","relation":"prerequisite","reason":"","sources":[]}}]}}
+5. definition 不超过50字，example 无需输出，excerpt 不超过40字，关系 reason 不超过20字；关系最多30条。
+6. 输出紧凑 json 格式：{{"nodes":[{{"name":"","type":"concept","definition":"","sources":[{{"document_id":"","page_no":1,"excerpt":"","confidence":0.9}}]}}],"edges":[{{"source":"","target":"","relation":"prerequisite","reason":"","sources":[{{"document_id":"","page_no":1,"excerpt":"","confidence":0.9}}]}}]}}
 
 已有输出（仅修复时参考）：
 {current}
@@ -209,7 +241,7 @@ def _request_extracted_graph(course_name: str, corpus: str, repair: bool, curren
 课程资料：
 {corpus}
 """.strip(),
-        max_tokens=6000,
+        max_tokens=12000,
         json_output=True,
     )
     try:
@@ -272,12 +304,17 @@ def _chat(
             response_payload = response.json()
             choice = response_payload["choices"][0]
             if choice.get("finish_reason") == "length":
-                raise ValueError("DeepSeek 输出被截断，请缩小课件范围后重试")
+                error = "DeepSeek 输出被截断（达到输出或上下文长度限制），本次不完整结果未应用"
+                _record_usage(capability, "failed", response_payload.get("usage", {}), started_at, error)
+                raise DeepSeekTruncatedError(error)
             content = choice["message"]["content"]
             if not content or not content.strip():
                 raise ValueError("DeepSeek 返回空内容")
             _record_usage(capability, "success", response_payload.get("usage", {}), started_at)
             return content.strip()
+        except DeepSeekTruncatedError:
+            # 相同预算重试只会重复消耗 Token；交给抽取层保留已有结果。
+            raise
         except (httpx.HTTPError, KeyError, IndexError, RuntimeError, ValueError) as exc:
             last_error = exc
             if attempt + 1 < attempts:
@@ -287,6 +324,10 @@ def _chat(
                 time.sleep(min(0.6 * (2 ** attempt), max(0.0, remaining - 0.5)))
     _record_usage(capability, "failed", {}, started_at, str(last_error or "unknown error"))
     raise ValueError(f"DeepSeek 调用失败：{last_error}")
+
+
+class DeepSeekTruncatedError(ValueError):
+    """模型返回 length 时的非瞬时错误，不按网络故障重试。"""
 
 
 def _record_usage(

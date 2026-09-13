@@ -96,6 +96,69 @@ class DeepSeekContractTestCase(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "知识图谱结构不合法"):
                 deepseek.extract_graph("测试课", [{"id": "doc_1", "filename": "a.md", "content": "正文"}])
 
+    def test_repair_failure_keeps_initial_graph_and_sources(self) -> None:
+        initial = json.loads(self.complete_graph_payload())
+        initial["nodes"] = initial["nodes"][:2]
+        initial["edges"] = initial["edges"][:1]
+        document = {"id": "doc_1", "filename": "chapter.md", "content": "知识点1的定义"}
+        for failure in (
+            deepseek.DeepSeekTruncatedError("输出被截断"),
+            ValueError("DeepSeek 调用失败：timeout"),
+            "invalid-json",
+            '{"nodes": [{"name": null}]}',
+        ):
+            with self.subTest(failure=str(failure)):
+                warnings: list[str] = []
+                with patch.object(deepseek, "_chat", side_effect=[json.dumps(initial), failure]):
+                    graph = deepseek.extract_graph("测试课", [document], warnings=warnings)
+                self.assertEqual([node.name for node in graph.nodes], ["知识点1", "知识点2"])
+                self.assertEqual(len(graph.edges), 1)
+                self.assertEqual(graph.nodes[0].source_refs[0].document_id, "doc_1")
+                self.assertEqual(graph.nodes[0].source_refs[0].excerpt, "知识点1的定义")
+                self.assertIn("已保留首次有效抽取结果", warnings[0])
+
+    def test_incremental_repair_preserves_base_and_references_existing_nodes(self) -> None:
+        complete = json.loads(self.complete_graph_payload())
+        initial = {"nodes": complete["nodes"][:19], "edges": complete["edges"][:18]}
+        duplicate = {**complete["nodes"][0], "definition": "不得覆盖首次定义"}
+        addition = {
+            "nodes": [duplicate, complete["nodes"][19]],
+            "edges": [
+                complete["edges"][0], complete["edges"][18],
+                {"source": "不存在", "target": "知识点1", "relation": "related"},
+                {"source": "知识点1", "target": "知识点1", "relation": "related"},
+            ],
+        }
+        with patch.object(deepseek, "_chat", side_effect=[json.dumps(initial), json.dumps(addition)]):
+            graph = deepseek.extract_graph("测试课", [{"id": "doc_1", "content": "知识点1的定义"}])
+        self.assertEqual(len(graph.nodes), 20)
+        self.assertEqual(len(graph.edges), 19)
+        self.assertEqual(graph.nodes[0].definition, "知识点1的定义")
+        self.assertTrue(graph.nodes[0].source_refs)
+        self.assertEqual(graph.edges[-1].target, graph.nodes[-1].id)
+
+    def test_initial_truncation_does_not_retry_identical_request_and_logs_usage(self) -> None:
+        usage = {"prompt_tokens": 2000, "completion_tokens": 12000, "total_tokens": 14000}
+        _FakeClient.responses = [_FakeResponse(200, {
+            "choices": [{"finish_reason": "length", "message": {"content": '{"nodes":['}}],
+            "usage": usage,
+        })]
+        with (
+            patch.object(deepseek.httpx, "Client", _FakeClient),
+            patch.object(deepseek, "_record_usage") as record,
+        ):
+            with self.assertRaises(deepseek.DeepSeekTruncatedError):
+                deepseek.extract_graph("测试课", [{"id": "doc_1", "content": "正文"}])
+        record.assert_called_once()
+        self.assertEqual(record.call_args.args[1:3], ("failed", usage))
+        self.assertEqual(_FakeClient.responses, [])
+
+    def test_empty_initial_graph_is_not_presented_as_success(self) -> None:
+        with patch.object(deepseek, "_chat", return_value='{"nodes": [], "edges": []}') as chat:
+            with self.assertRaisesRegex(ValueError, "未抽取到有效知识点"):
+                deepseek.extract_graph("测试课", [{"id": "doc_1", "content": "正文"}])
+        chat.assert_called_once()
+
     def test_chat_retries_429_then_returns_content(self) -> None:
         _FakeClient.responses = [
             _FakeResponse(429, {}),

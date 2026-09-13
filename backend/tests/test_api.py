@@ -12,6 +12,7 @@ TEST_DATA = tempfile.TemporaryDirectory()
 os.environ["COURSEGRAPH_DATA_DIR"] = str(Path(TEST_DATA.name) / "data")
 # API 回归必须保持离线，避免开发者本机配置 Key 后测试误调用真实服务。
 os.environ["DEEPSEEK_API_KEY"] = ""
+os.environ["NEO4J_HTTP_URL"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -269,6 +270,41 @@ class ApiTestCase(unittest.TestCase):
         self.assertFalse(payload["configured"])
         self.assertEqual(payload["mode"], "offline")
         self.assertNotIn("key", json.dumps(payload).lower())
+
+    def test_truncated_repair_creates_review_candidate_without_publishing(self) -> None:
+        from app.services import deepseek
+
+        headers = self.headers(self.login("teacher", "Teacher123!"))
+        course = self.client.post("/api/courses", headers=headers, json={"name": "补全降级回归"})
+        self.assertEqual(course.status_code, 201, course.text)
+        course_id = course.json()["id"]
+        uploaded = self.client.post(
+            f"/api/courses/{course_id}/documents", headers=headers,
+            files={"file": ("chapter.md", "变量保存数据".encode("utf-8"), "text/markdown")},
+        )
+        self.assertEqual(uploaded.status_code, 201, uploaded.text)
+        initial = json.dumps({"nodes": [{
+            "name": "变量", "definition": "变量保存数据",
+            "sources": [{"document_id": uploaded.json()["id"], "excerpt": "变量保存数据"}],
+        }], "edges": []})
+        with (
+            patch.dict(os.environ, {"DEEPSEEK_API_KEY": "test-key"}),
+            patch.object(deepseek, "_chat", side_effect=[initial, deepseek.DeepSeekTruncatedError("输出被截断")]),
+        ):
+            response = self.client.post(f"/api/courses/{course_id}/extract", headers=headers)
+        self.assertEqual(response.status_code, 202, response.text)
+        job = self.client.get(f"/api/extraction-jobs/{response.json()['id']}", headers=headers).json()
+        self.assertEqual(job["status"], "review")
+        self.assertIn("已保留首次有效抽取结果", job["message"])
+        self.assertIn("未达到 20", job["message"])
+        candidate = self.client.get(
+            f"/api/courses/{course_id}/graph/versions/{job['candidate_version_id']}", headers=headers,
+        ).json()
+        self.assertEqual(candidate["status"], "candidate")
+        self.assertIn("自动补全未完成", candidate["summary"])
+        self.assertEqual(candidate["graph"]["nodes"][0]["name"], "变量")
+        self.assertEqual(candidate["graph"]["nodes"][0]["source_refs"][0]["document_id"], uploaded.json()["id"])
+        self.assertEqual(self.client.get(f"/api/courses/{course_id}/graph", headers=headers).json()["nodes"], [])
 
     def test_bm25_evidence_is_course_scoped_and_refuses_unknown_questions(self) -> None:
         teacher = self.login("teacher", "Teacher123!")

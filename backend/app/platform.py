@@ -822,7 +822,7 @@ def class_mastered_node_ids(classroom_id: str, user: User) -> list[str]:
 def diagnosis(classroom_id: str, user: User) -> DiagnosisResult:
     from app import graph_lifecycle
     from app.services import deepseek
-    from app.services.recommender import recommend_path
+    from app.services.recommender import recommend_path_for_course
 
     graph = get_class_graph(classroom_id, user)
     mastered = [node for node in graph.nodes if node.mastered]
@@ -832,7 +832,7 @@ def diagnosis(classroom_id: str, user: User) -> DiagnosisResult:
     if not suggestions:
         suggestions = ["本课程知识点已全部标记掌握，可进入综合练习。"]
     classroom = get_classroom(classroom_id, user)
-    path = recommend_path(graph, [node.id for node in mastered])
+    path = recommend_path_for_course(classroom.course_id, graph, [node.id for node in mastered])
     query = " ".join(node.name for node in weak[:5])
     evidence, _ = graph_lifecycle.retrieve_evidence(classroom.course_id, query, user) if query else ([], [])
     with connect() as connection:

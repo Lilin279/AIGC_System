@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from threading import Thread
 from typing import Annotated, TypeVar
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, UploadFile
@@ -22,7 +23,7 @@ from app.models import (
 )
 from app.services import deepseek
 from app.services.parser import parse_text_file
-from app.services.recommender import recommend_path
+from app.services.recommender import recommend_path_for_course
 
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
@@ -33,7 +34,7 @@ T = TypeVar("T")
 app = FastAPI(
     title="AIGC 课程知识图谱学习导航系统",
     description="面向学校的课程、教学班、可溯源图谱与个性化学习平台。",
-    version="0.4.0",
+    version="0.5.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +49,9 @@ app.add_middleware(
 def startup() -> None:
     storage.init_store()
     graph_lifecycle.resume_pending_jobs()
+    from app.services.neo4j_adapter import configured as neo4j_configured, retry_pending_syncs
+    if neo4j_configured():
+        Thread(target=retry_pending_syncs, name="neo4j-sync-retry", daemon=True).start()
 
 
 def current_user(
@@ -330,7 +334,7 @@ def learning_path(
     mastered = payload.mastered_node_ids
     if mastered is None:
         mastered = execute(lambda: storage.mastered_node_ids(course_id, user)) if user.role == "student" else []
-    result = recommend_path(graph, mastered)
+    result = recommend_path_for_course(course_id, graph, mastered)
     rate = round(100 * len(mastered) / max(1, len(graph.nodes)), 1)
     return execute(lambda: graph_lifecycle.enrich_learning_path(course_id, result, user, rate))
 
@@ -417,8 +421,8 @@ def class_learning_path(
     if mastered is None and user.role == "student":
         mastered = execute(lambda: platform.class_mastered_node_ids(classroom_id, user))
     mastered = mastered or []
-    result = recommend_path(graph, mastered)
     classroom = execute(lambda: platform.get_classroom(classroom_id, user))
+    result = recommend_path_for_course(classroom.course_id, graph, mastered)
     rate = round(100 * len(mastered) / max(1, len(graph.nodes)), 1)
     return execute(lambda: graph_lifecycle.enrich_learning_path(classroom.course_id, result, user, rate))
 
@@ -503,6 +507,19 @@ def avatar_file(filename: str, user: Annotated[User, Depends(current_user)]) -> 
 def integrations(user: Annotated[User, Depends(operational_user)]) -> dict:
     from app.services.neo4j_adapter import status as neo4j_status
     return {"aigc": {"mode": deepseek.extraction_mode()}, "neo4j": neo4j_status()}
+
+
+@app.post("/api/courses/{course_id}/graph/sync")
+def sync_course_graph(course_id: str, user: Annotated[User, Depends(operational_user)]) -> dict:
+    return execute(lambda: graph_lifecycle.sync_neo4j(course_id, user))
+
+
+@app.post("/api/admin/integrations/neo4j/sync")
+def sync_all_course_graphs(user: Annotated[User, Depends(operational_user)]) -> dict:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可以执行全校图谱同步")
+    from app.services.neo4j_adapter import sync_all_confirmed_graphs
+    return sync_all_confirmed_graphs()
 
 
 @app.put("/api/admin/tickets/{ticket_id}", response_model=Ticket)

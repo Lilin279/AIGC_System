@@ -220,10 +220,12 @@ def delete_course(course_id: str, user: User) -> dict:
     _assert_own_course(course_id, user)
     with connect() as connection:
         connection.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+    from app.services.neo4j_adapter import remove_course_graph
+    neo4j_result = remove_course_graph(course_id)
     course_upload_dir = UPLOAD_DIR / course_id
     if course_upload_dir.exists():
         shutil.rmtree(course_upload_dir)
-    return {"deleted": course_id}
+    return {"deleted": course_id, "neo4j": neo4j_result}
 
 
 def get_graph(course_id: str, user: User) -> KnowledgeGraph:

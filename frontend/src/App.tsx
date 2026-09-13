@@ -9,7 +9,7 @@ import { api, hasAccessToken, setAccessToken } from './api';
 import GraphView from './components/GraphView';
 import type {
   AIStatus, Classroom, Course, DashboardStats, DiagnosisResult, DocumentImpact, DocumentInfo,
-  ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview,
+  ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
   KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, RelationType,
   Ticket, User,
 } from './types';
@@ -172,6 +172,7 @@ function CourseStudio({ run }: RunProps) {
   const [jobs, setJobs] = useState<ExtractionJob[]>([]); const [versions, setVersions] = useState<GraphVersion[]>([]);
   const [quality, setQuality] = useState<GraphQuality>(); const [selected, setSelected] = useState<KnowledgeNode>();
   const [aiStatus, setAiStatus] = useState<AIStatus>();
+  const [integrations, setIntegrations] = useState<IntegrationStatus>();
   const [nodeForm, setNodeForm] = useState({ name: '', type: 'concept', definition: '', example: '', resources: [] as string[], mastered: false });
   const [edgeForm, setEdgeForm] = useState<{ source: string; target: string; relation: RelationType; label: string }>({ source: '', target: '', relation: 'prerequisite', label: '前置关系' });
   const [newCourse, setNewCourse] = useState({ name: '', description: '', status: 'draft' as Course['status'] });
@@ -183,6 +184,7 @@ function CourseStudio({ run }: RunProps) {
   useEffect(() => { void run(loadCourses); }, [loadCourses, run]);
   useEffect(() => { void run(() => loadCourse(courseId)); }, [courseId, loadCourse, run]);
   useEffect(() => { void run(async () => setAiStatus(await api.aiStatus())); }, [run]);
+  useEffect(() => { void run(async () => setIntegrations(await api.integrations())); }, [run]);
   useEffect(() => { if (selected) setNodeForm({ ...selected }); }, [selected]);
 
   const startExtraction = async () => { const job = await api.extract(courseId); setJobs((old) => [job, ...old]); const timer = window.setInterval(async () => { const latest = await api.extractionJob(job.id); setJobs((old) => old.map((item) => item.id === latest.id ? latest : item)); if (['review', 'completed', 'failed'].includes(latest.status)) { window.clearInterval(timer); await loadCourse(courseId); } }, 900); };
@@ -192,7 +194,7 @@ function CourseStudio({ run }: RunProps) {
   const openDelete = (doc: DocumentInfo) => run(async () => setDeleteDoc({ doc, impact: await api.documentImpact(courseId, doc.id), rollback: true }));
   return <>
     <PageHeading title="课程工作室" description="课件生成候选图谱，教师审核确认后才会影响学生看到的正式版本。" actions={<button className="secondary" onClick={() => void loadCourse(courseId)}><RefreshCw size={16} />刷新</button>} />
-    <div className="studio-toolbar"><select value={courseId} onChange={(e) => setCourseId(e.target.value)}>{courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><span className={`badge ${course?.status}`}>{course?.status === 'published' ? '已发布' : '草稿'}</span>{course?.source_incomplete && <span className="badge warning">来源不完整</span>}<div className="quality">图谱质量 <b>{quality?.score ?? 0}</b>/100</div></div>
+    <div className="studio-toolbar"><select value={courseId} onChange={(e) => setCourseId(e.target.value)}>{courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><span className={`badge ${course?.status}`}>{course?.status === 'published' ? '已发布' : '草稿'}</span>{course?.source_incomplete && <span className="badge warning">来源不完整</span>}<span className={`ai-mode compact ${integrations?.neo4j.available ? 'online' : 'offline'}`}><Database size={14} />{integrations?.neo4j.available ? `Neo4j 已连接 · ${integrations.neo4j.nodes ?? 0} 节点` : integrations?.neo4j.enabled ? 'Neo4j 连接异常' : 'Neo4j 未配置'}</span><button className="secondary" disabled={!courseId || !integrations?.neo4j.enabled} onClick={() => run(async () => { const result = await api.syncNeo4j(courseId); if (!result.synced) throw new Error(result.message); setIntegrations(await api.integrations()); }, '当前课程已同步并通过 Neo4j 一致性校验。')}><RefreshCw size={14} />同步图谱</button><div className="quality">图谱质量 <b>{quality?.score ?? 0}</b>/100</div></div>
     <div className="studio-grid">
       <section className="surface graph-workspace"><div className="surface-title"><div><h3>{course?.name ?? '暂无课程'}</h3><p>{graph.nodes.length} 个知识点 · {graph.edges.length} 条关系</p></div></div><GraphView graph={graph} selectedNodeId={selected?.id} pathEdgeIds={emptyPathEdgeIds} onSelectNode={setSelected} /></section>
       <aside className="studio-side">

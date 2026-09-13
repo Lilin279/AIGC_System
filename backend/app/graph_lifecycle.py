@@ -81,11 +81,13 @@ def process_extraction_job(job_id: str) -> None:
                 "UPDATE extraction_jobs SET status = 'extracting', progress = 45, message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 ("正在调用 DeepSeek 进行结构化抽取" if job["mode"] == "deepseek" else "正在运行离线 Mock 抽取", job_id),
             )
-        extracted_graph = deepseek.extract_graph(course["name"], documents)
+        extraction_warnings: list[str] = []
+        extracted_graph = deepseek.extract_graph(course["name"], documents, warnings=extraction_warnings)
         with connect() as connection:
             active_graph = KnowledgeGraph(**_graph_dict(connection, job["course_id"]))
             graph, added_nodes, added_edges = _merge_graphs(active_graph, extracted_graph)
             quality_warning = _extraction_quality_warning(extracted_graph) if job["mode"] == "deepseek" else ""
+            quality_warning = "；".join(filter(None, [*extraction_warnings, quality_warning]))
             quality_suffix = f"；质量提醒：{quality_warning}" if quality_warning else ""
             connection.execute(
                 "UPDATE extraction_jobs SET status = 'merging', progress = 78, message = '正在融合知识点与关系', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -286,7 +288,7 @@ def accept_version(course_id: str, version_id: str, user: User) -> GraphVersion:
     result = get_version(course_id, version_id, user)
     if result.graph:
         from app.services.neo4j_adapter import sync_confirmed_graph
-        sync_confirmed_graph(course_id, result.graph)
+        sync_confirmed_graph(course_id, result.graph, result.id)
     return result
 
 
@@ -322,7 +324,7 @@ def restore_version(course_id: str, version_id: str, user: User) -> GraphVersion
     result = get_version(course_id, restored_id, user)
     if result.graph:
         from app.services.neo4j_adapter import sync_confirmed_graph
-        sync_confirmed_graph(course_id, result.graph)
+        sync_confirmed_graph(course_id, result.graph, result.id)
     return result
 
 
@@ -333,6 +335,8 @@ def capture_active_snapshot(course_id: str, user: User, trigger: str, summary: s
         version_id = _create_version(connection, course_id, graph, user.id, trigger, summary, "active")
         connection.execute("UPDATE graph_versions SET status = 'superseded' WHERE course_id = ? AND id != ? AND status = 'active'", (course_id, version_id))
         connection.execute("UPDATE courses SET active_version_id = ? WHERE id = ?", (version_id, course_id))
+    from app.services.neo4j_adapter import sync_confirmed_graph
+    sync_confirmed_graph(course_id, graph, version_id)
     return version_id
 
 
@@ -443,6 +447,8 @@ def delete_document(course_id: str, document_id: str, rollback_graph: bool, user
     path = Path(storage_path)
     if path.is_file() and UPLOAD_DIR in path.parents:
         path.unlink()
+    from app.services.neo4j_adapter import sync_confirmed_graph
+    sync_confirmed_graph(course_id, graph, version_id)
     return {
         "deleted": document_id,
         "rollback_graph": rollback_graph,
@@ -479,6 +485,12 @@ def graph_quality(course_id: str, user: User) -> GraphQuality:
         score=score, duplicate_rate=duplicate_rate, isolated_rate=isolated_rate,
         relation_coverage=relation_coverage, source_coverage=source_coverage, notes=notes,
     )
+
+
+def sync_neo4j(course_id: str, user: User) -> dict:
+    _assert_course_manage(course_id, user)
+    from app.services.neo4j_adapter import sync_course_from_sqlite
+    return sync_course_from_sqlite(course_id)
 
 
 def retrieve_evidence(course_id: str, query: str, user: User, limit: int = 5) -> tuple[list[dict], list[KnowledgeNode]]:
@@ -536,13 +548,32 @@ def retrieve_evidence(course_id: str, query: str, user: User, limit: int = 5) ->
     for node in citations:
         evidence.append({"source": f"知识点：{node.name}", "excerpt": node.definition, "type": "graph"})
     citation_ids = {node.id for node in citations}
-    for edge in edges:
-        if edge["source"] in citation_ids or edge["target"] in citation_ids:
-            source = next((node["name"] for node in nodes if node["id"] == edge["source"]), edge["source"])
-            target = next((node["name"] for node in nodes if node["id"] == edge["target"]), edge["target"])
-            evidence.append({"source": "图谱邻居扩展", "excerpt": f"{source} -[{edge['label']}]-> {target}", "type": "relation"})
+    from app.services.neo4j_adapter import expand_neighbors
+    neo4j_neighbors = expand_neighbors(course_id, list(citation_ids), max(1, 8 - len(evidence)))
+    if neo4j_neighbors is not None:
+        for edge in neo4j_neighbors:
+            evidence.append({
+                "source": "Neo4j 图谱邻居扩展",
+                "excerpt": f"{edge['source_name']} -[{edge['label']}]-> {edge['target_name']}",
+                "type": "relation",
+                "backend": "neo4j",
+                "relation_id": edge["id"],
+            })
             if len(evidence) >= 8:
                 break
+    else:
+        for edge in edges:
+            if edge["source"] in citation_ids or edge["target"] in citation_ids:
+                source = next((node["name"] for node in nodes if node["id"] == edge["source"]), edge["source"])
+                target = next((node["name"] for node in nodes if node["id"] == edge["target"]), edge["target"])
+                evidence.append({
+                    "source": "SQLite 图谱邻居扩展",
+                    "excerpt": f"{source} -[{edge['label']}]-> {target}",
+                    "type": "relation",
+                    "backend": "sqlite",
+                })
+                if len(evidence) >= 8:
+                    break
     return evidence[:8], citations
 
 
@@ -550,9 +581,11 @@ def graphrag_answer(course_id: str, question: str, user: User) -> QAResult:
     evidence, citations = retrieve_evidence(course_id, question, user)
     answer = deepseek.answer_with_evidence(question, evidence)
     confidence = _qa_confidence(evidence, citations)
+    graph_backend = "+neo4j" if any(item.get("backend") == "neo4j" for item in evidence) else ""
     return QAResult(
         answer=answer, citations=citations, confidence=confidence,
-        evidence=evidence, mode="deepseek-graphrag" if deepseek.configured() else "offline-graphrag",
+        evidence=evidence,
+        mode=("deepseek-graphrag" if deepseek.configured() else "offline-graphrag") + graph_backend,
     )
 
 
@@ -590,6 +623,8 @@ def enrich_learning_path(
             course["name"] if course else "课程", mastery_rate, recommendation_nodes, recommendation_nodes, evidence,
         ) if not deepseek.configured() else "AI 服务暂不可用，当前路径仍由前置关系规则生成。"
         mode = "offline-fallback"
+    if result.mode == "neo4j-rule":
+        mode += "+neo4j"
     return result.model_copy(update={"ai_summary": summary, "mode": mode, "evidence": evidence[:4]})
 
 
