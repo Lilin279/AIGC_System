@@ -145,7 +145,7 @@ function AuthScreen({ initialMessage, onAuthenticated }: { initialMessage: strin
   };
   return (
     <main className="auth-page">
-      <section className="auth-intro"><Network size={36} /><h1>CourseGraph AI</h1><p>课程知识图谱构建、教学班管理与可溯源智能学习平台</p><div><span><Check size={16} />课件来源可追溯</span><span><Check size={16} />班级数据相互隔离</span><span><Check size={16} />AIGC 候选图谱审核</span></div></section>
+      <section className="auth-intro"><h1>CourseGraph AI</h1><p>课程知识图谱构建、教学班管理与可溯源智能学习平台</p><div><span><Check size={16} />课件来源可追溯</span><span><Check size={16} />班级数据相互隔离</span><span><Check size={16} />AIGC 候选图谱审核</span></div></section>
       <section className="auth-panel">
         <div className="segmented">{(['login', 'student', 'teacher'] as const).map((item) => <button key={item} className={mode === item ? 'active' : ''} onClick={() => setMode(item)}>{item === 'login' ? '登录' : item === 'student' ? '学生注册' : '教师申请'}</button>)}</div>
         <h2>{mode === 'login' ? '欢迎回来' : mode === 'student' ? '创建学生账号' : '提交教师入驻申请'}</h2>
