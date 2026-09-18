@@ -196,11 +196,49 @@ class DeepSeekContractTestCase(unittest.TestCase):
         self.assertEqual(result[0].mode, "offline-rule")
         self.assertEqual(result[0].question_type, "基础题")
 
+    def test_offline_exercises_respect_selected_types_and_count(self) -> None:
+        nodes = [
+            KnowledgeNode(id="n1", name="变量", definition="保存数据"),
+            KnowledgeNode(id="n2", name="条件语句", definition="根据条件选择分支"),
+        ]
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}, clear=False):
+            result = deepseek.exercises("测试课", nodes, [], ["应用题", "易错题"], 5)
+        self.assertEqual(len(result), 5)
+        self.assertEqual({item.question_type for item in result}, {"应用题", "易错题"})
+
     def test_learning_analysis_returns_plain_text(self) -> None:
         node = KnowledgeNode(id="n1", name="词法分析", definition="将字符流转换为记号流")
         with patch.object(deepseek, "_chat", return_value="**薄弱原因**\n- 需要复习[1]"):
             result = deepseek.learning_analysis("编译原理", 20, [node], [node], [{"source": "课件", "excerpt": "证据"}])
         self.assertEqual(result, "薄弱原因\n需要复习[1]")
+
+    def test_qa_prompt_combines_course_evidence_with_general_knowledge(self) -> None:
+        answer = (
+            "**结论：Python 常见变量类型包括 int、float、str 和 bool。**\n"
+            "课程图谱：图谱给出变量与数据类型的关系[1]。\n"
+            "补充知识：int 表示整数，float 表示小数，str 表示文本，bool 表示真假。"
+        )
+        with patch.object(deepseek, "_chat", return_value=answer) as chat:
+            result = deepseek.answer_with_evidence(
+                "Python 有哪些常见变量类型？",
+                [
+                    {"source": "图谱", "excerpt": "变量 -[相关关系]-> 数据类型"},
+                ],
+            )
+        payload = chat.call_args.args[0]
+        system_prompt = payload["messages"][0]["content"]
+        self.assertIn("但不是知识上限", system_prompt)
+        self.assertIn("自身掌握的稳定、通用学科知识", system_prompt)
+        self.assertIn("通用知识放在‘补充知识’部分且不要伪造引用", system_prompt)
+        self.assertIn("包含关系不等于前置关系", system_prompt)
+        self.assertEqual(result, answer.replace("**", ""))
+        self.assertIn("\n补充知识：", result)
+
+    def test_online_qa_can_answer_when_course_evidence_is_empty(self) -> None:
+        with patch.object(deepseek, "_chat", return_value="结论：int 是 Python 的整数类型。") as chat:
+            result = deepseek.answer_with_evidence("Python 中 int 是什么？", [])
+        self.assertIn("int", result)
+        self.assertIn("未检索到课程证据", chat.call_args.args[0]["messages"][1]["content"])
 
 
 if __name__ == "__main__":

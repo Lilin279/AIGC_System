@@ -105,9 +105,12 @@ def register_student(payload: RegisterRequest) -> User:
         raise ValueError("密码至少需要 8 个字符")
     if not name:
         raise ValueError("姓名不能为空")
+    organization = payload.organization.strip()
+    if not organization:
+        raise ValueError("学校名称不能为空")
     user = User(
         id=f"user_{uuid.uuid4().hex[:12]}", username=username, name=name, role="student",
-        organization=payload.organization.strip() or "金扬智能示范学校", account_status="active",
+        organization=organization, account_status="active",
     )
     try:
         with connect() as connection:

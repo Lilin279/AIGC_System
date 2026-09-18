@@ -14,7 +14,7 @@ from app.auth import issue_session, revoke_session, user_from_token
 from app.models import (
     AIStatus, AdminUserUpdate, ClassPrimaryTeacherUpdate, ClassTeacherAssign, Classroom, ClassroomCreate, ClassroomUpdate,
     Course, CourseCreate, CourseUpdate, DashboardStats, DiagnosisResult, DocumentImpact,
-    DocumentInfo, EnrollmentCreate, ExerciseResult, ExtractionJob, GraphQuality, GraphVersion,
+    DocumentInfo, EnrollmentCreate, ExerciseGenerateRequest, ExerciseResult, ExtractionJob, GraphQuality, GraphVersion,
     ImportCommitResult, ImportPreview, JoinClassRequest, KnowledgeEdge, KnowledgeEdgeCreate,
     KnowledgeEdgeUpdate, KnowledgeGraph, KnowledgeNode, KnowledgeNodeCreate, LearningPathRequest,
     LearningPathResult, LoginRequest, LoginResult, PasswordUpdate, ProfileUpdate, ProgressUpdate,
@@ -439,8 +439,12 @@ def class_diagnosis(classroom_id: str, user: Annotated[User, Depends(operational
 
 
 @app.post("/api/classrooms/{classroom_id}/exercises", response_model=list[ExerciseResult])
-def class_exercises(classroom_id: str, user: Annotated[User, Depends(operational_user)]) -> list[ExerciseResult]:
-    return execute(lambda: platform.generate_exercises(classroom_id, user))
+def class_exercises(
+    classroom_id: str,
+    user: Annotated[User, Depends(operational_user)],
+    payload: ExerciseGenerateRequest | None = None,
+) -> list[ExerciseResult]:
+    return execute(lambda: platform.generate_exercises(classroom_id, user, payload or ExerciseGenerateRequest()))
 
 
 # Feedback tickets

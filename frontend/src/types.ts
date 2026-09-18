@@ -211,6 +211,12 @@ export interface ExerciseResult {
   mode: string;
 }
 
+export type ExerciseQuestionType = '基础题' | '应用题' | '易错题';
+export interface ExerciseGenerateRequest {
+  question_types: ExerciseQuestionType[];
+  count: number;
+}
+
 export interface TicketMessage { id: string; content: string; created_at: string; author_id: string; author_name: string; author_role: string }
 export interface Ticket {
   id: string;

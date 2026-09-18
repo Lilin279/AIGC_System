@@ -85,6 +85,21 @@ class ApiTestCase(unittest.TestCase):
         self.assertEqual(reviewed.json()["account_status"], "active")
         self.assertEqual(self.client.get("/api/courses", headers=pending_headers).status_code, 200)
 
+    def test_registration_requires_organization(self) -> None:
+        student = self.client.post(
+            "/api/auth/register",
+            json={"username": "student_without_org", "password": "Password123!", "name": "未填写学校学生"},
+        )
+        self.assertEqual(student.status_code, 400, student.text)
+        self.assertEqual(student.json()["detail"], "学校名称不能为空")
+
+        teacher = self.client.post(
+            "/api/auth/register/teacher",
+            json={"username": "teacher_without_org", "password": "Password123!", "name": "未填写学校教师"},
+        )
+        self.assertEqual(teacher.status_code, 400, teacher.text)
+        self.assertEqual(teacher.json()["detail"], "学校名称不能为空")
+
     def test_class_progress_isolated_and_ticket_visible(self) -> None:
         first = self.login("student", "Student123!")
         classroom = self.client.get("/api/classrooms", headers=self.headers(first)).json()[0]
@@ -358,9 +373,11 @@ class ApiTestCase(unittest.TestCase):
 
         exercises = self.client.post(
             f"/api/classrooms/{classroom['id']}/exercises", headers=headers,
+            json={"question_types": ["基础题", "易错题"], "count": 5},
         )
         self.assertEqual(exercises.status_code, 200, exercises.text)
-        self.assertTrue(exercises.json())
+        self.assertEqual(len(exercises.json()), 5)
+        self.assertEqual({item["question_type"] for item in exercises.json()}, {"基础题", "易错题"})
         self.assertTrue(all(item["mode"] == "offline-rule" for item in exercises.json()))
 
 

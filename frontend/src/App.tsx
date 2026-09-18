@@ -9,7 +9,7 @@ import { api, hasAccessToken, setAccessToken } from './api';
 import GraphView from './components/GraphView';
 import type {
   AIStatus, Classroom, Course, DashboardStats, DiagnosisResult, DocumentImpact, DocumentInfo,
-  ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
+  ExerciseQuestionType, ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
   KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, RelationType,
   Ticket, User,
 } from './types';
@@ -74,7 +74,7 @@ export default function App() {
 
       <section className="portal-main">
         <header className="portal-topbar">
-          <div><h1>{nav.find((item) => item.view === view)?.label ?? '工作台'}</h1><p>{user.organization}</p></div>
+          <div><h1>{nav.find((item) => item.view === view)?.label ?? '工作台'}</h1><p>课程知识图谱平台</p></div>
           <button className="user-menu" onClick={() => setView('profile')}>
             <span>{user.name.slice(0, 1)}</span><div><b>{user.name}</b><small>{roleName(user.role)}</small></div>
           </button>
@@ -131,9 +131,12 @@ const pendingNav = [
 
 function AuthScreen({ initialMessage, onAuthenticated }: { initialMessage: string; onAuthenticated: (user: User) => void }) {
   const [mode, setMode] = useState<'login' | 'student' | 'teacher'>('login');
-  const [form, setForm] = useState({ username: 'teacher', password: 'Teacher123!', name: '', organization: '金扬智能示范学校', email: '', phone: '', department: '计算机学院', title: '讲师' });
+  const [form, setForm] = useState({ username: '', password: '', name: '', organization: '', email: '', phone: '', department: '', title: '' });
   const [error, setError] = useState(initialMessage);
   const submit = async () => {
+    setError('');
+    if (!form.username.trim() || !form.password) { setError('请输入用户名和密码'); return; }
+    if (mode !== 'login' && (!form.name.trim() || !form.organization.trim())) { setError('请输入姓名和学校名称'); return; }
     try {
       const result = mode === 'login' ? await api.login(form.username, form.password)
         : mode === 'teacher' ? await api.registerTeacher(form) : await api.registerStudent(form);
@@ -147,11 +150,11 @@ function AuthScreen({ initialMessage, onAuthenticated }: { initialMessage: strin
         <div className="segmented">{(['login', 'student', 'teacher'] as const).map((item) => <button key={item} className={mode === item ? 'active' : ''} onClick={() => setMode(item)}>{item === 'login' ? '登录' : item === 'student' ? '学生注册' : '教师申请'}</button>)}</div>
         <h2>{mode === 'login' ? '欢迎回来' : mode === 'student' ? '创建学生账号' : '提交教师入驻申请'}</h2>
         {mode !== 'login' && <label>姓名<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>}
+        {mode !== 'login' && <label>学校名称<input value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} /></label>}
         <label>用户名<input autoComplete="username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
         <label>密码<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
         {mode === 'teacher' && <><label>邮箱<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label><div className="field-grid"><label>院系<input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} /></label><label>职称<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label></div></>}
         <button className="primary wide" onClick={submit}>{mode === 'login' ? '登录系统' : mode === 'student' ? '注册并开始学习' : '提交申请'}</button>
-        {mode === 'login' && <div className="demo-logins"><span>演示身份</span><button onClick={() => setForm({ ...form, username: 'teacher', password: 'Teacher123!' })}>教师</button><button onClick={() => setForm({ ...form, username: 'student', password: 'Student123!' })}>学生</button><button onClick={() => setForm({ ...form, username: 'admin', password: 'Admin123!' })}>管理员</button></div>}
         {error && <p className="form-error">{error}</p>}
       </section>
     </main>
@@ -199,7 +202,7 @@ function CourseStudio({ run }: RunProps) {
       <section className="surface graph-workspace"><div className="surface-title"><div><h3>{course?.name ?? '暂无课程'}</h3><p>{graph.nodes.length} 个知识点 · {graph.edges.length} 条关系</p></div></div><GraphView graph={graph} selectedNodeId={selected?.id} pathEdgeIds={emptyPathEdgeIds} onSelectNode={setSelected} /></section>
       <aside className="studio-side">
         <details className="surface" open><summary><Plus size={17} />新建课程</summary><label>名称<input value={newCourse.name} onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })} /></label><label>简介<textarea value={newCourse.description} onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })} /></label><button className="primary" onClick={() => run(async () => { const created = await api.createCourse(newCourse); await loadCourses(); setCourseId(created.id); }, '课程已创建。')}><Plus size={16} />开设课程</button></details>
-        <details className="surface" open><summary><FileUp size={17} />课件与抽取</summary>{aiStatus && <div className={`ai-mode ${aiStatus.configured ? 'online' : 'offline'}`}><Bot size={15} /><span>{aiStatus.configured ? `DeepSeek 真 AI · ${aiStatus.model}` : '离线演示模式 · 未配置 API Key'}</span></div>}<label className="upload-box"><Upload size={20} /><span>上传 PDF、Word、PPT、TXT 或 Markdown</span><input type="file" accept=".pdf,.docx,.pptx,.txt,.md,.markdown" onChange={(e) => { const file = e.target.files?.[0]; if (file) void run(async () => { await api.uploadDocument(courseId, file); await loadCourse(courseId); await startExtraction(); }, '课件已解析，正在自动生成待审核图谱。'); }} /></label><div className="compact-list">{docs.map((doc) => <div key={doc.id}><FileText size={15} /><span><b>{doc.filename}</b><small>{doc.format.toUpperCase()} · {doc.source_node_count > 0 ? `正式图谱来源节点 ${doc.source_node_count}` : hasCandidateVersion ? '新增内容待审核' : '尚未应用到正式图谱'}</small></span><button title="删除课件" onClick={() => void openDelete(doc)}><Trash2 size={15} /></button></div>)}</div><button className="primary wide" disabled={!docs.length} onClick={extract}><Bot size={16} />重新生成候选图谱</button>{jobs[0] && <div className="job"><div><span>{jobs[0].mode === 'mock' ? '离线演示模式' : 'DeepSeek 模式'}</span><b>{jobs[0].progress}%</b></div><progress value={jobs[0].progress} max={100} /><small>{jobs[0].message}</small></div>}</details>
+        <details className="surface" open><summary><FileUp size={17} />课件与抽取</summary>{aiStatus && <div className={`ai-mode ${aiStatus.configured ? 'online' : 'offline'}`}><Bot size={15} /><span>{aiStatus.configured ? `DeepSeek 真 AI · ${aiStatus.model}` : 'AI 服务未配置 · 当前使用本地规则'}</span></div>}<label className="upload-box"><Upload size={20} /><span>上传 PDF、Word、PPT、TXT 或 Markdown</span><input type="file" accept=".pdf,.docx,.pptx,.txt,.md,.markdown" onChange={(e) => { const file = e.target.files?.[0]; if (file) void run(async () => { await api.uploadDocument(courseId, file); await loadCourse(courseId); await startExtraction(); }, '课件已解析，正在自动生成待审核图谱。'); }} /></label><div className="compact-list">{docs.map((doc) => <div key={doc.id}><FileText size={15} /><span><b>{doc.filename}</b><small>{doc.format.toUpperCase()} · {doc.source_node_count > 0 ? `正式图谱来源节点 ${doc.source_node_count}` : hasCandidateVersion ? '新增内容待审核' : '尚未应用到正式图谱'}</small></span><button title="删除课件" onClick={() => void openDelete(doc)}><Trash2 size={15} /></button></div>)}</div><button className="primary wide" disabled={!docs.length} onClick={extract}><Bot size={16} />重新生成候选图谱</button>{jobs[0] && <div className="job"><div><span>{jobs[0].mode === 'mock' ? '本地规则模式' : 'DeepSeek 模式'}</span><b>{jobs[0].progress}%</b></div><progress value={jobs[0].progress} max={100} /><small>{jobs[0].message}</small></div>}</details>
         <details className="surface" open><summary><ShieldCheck size={17} />候选版本审核</summary>{versions.filter((v) => v.status === 'candidate').map((version) => <div className="review-item" key={version.id}><div><b>版本 {version.version_no}</b><small>{version.summary}</small></div><button className="icon-success" title="确认应用" onClick={() => run(async () => { await api.acceptVersion(courseId, version.id); await loadCourse(courseId); }, '候选图谱已应用。')}><Check size={16} /></button><button className="icon-danger" title="驳回" onClick={() => run(async () => { await api.rejectVersion(courseId, version.id); await loadCourse(courseId); }, '候选图谱已驳回。')}><X size={16} /></button></div>)}{!versions.some((v) => v.status === 'candidate') && <p className="muted">当前没有待审核版本。</p>}<div className="compact-list">{versions.filter((v) => v.status !== 'candidate').slice(0, 4).map((v) => <div key={v.id}><History size={15} /><span><b>v{v.version_no} · {v.status}</b><small>{v.summary}</small></span>{v.status === 'superseded' && <button title="恢复此版本" onClick={() => run(async () => { await api.restoreVersion(courseId, v.id); await loadCourse(courseId); }, '历史版本已恢复。')}><RefreshCw size={15} /></button>}</div>)}</div></details>
         <details className="surface"><summary><Network size={17} />知识点编辑</summary><div className="button-row"><button className="secondary" onClick={() => { setSelected(undefined); setNodeForm({ name: '', type: 'concept', definition: '', example: '', resources: [], mastered: false }); }}><Plus size={15} />新建</button><button className="primary" onClick={saveNode}><Save size={15} />保存</button>{selected && <button className="danger" onClick={() => run(async () => { await api.deleteNode(courseId, selected.id); setSelected(undefined); await loadCourse(courseId); }, '知识点已删除。')}><Trash2 size={15} /></button>}</div><label>名称<input value={nodeForm.name} onChange={(e) => setNodeForm({ ...nodeForm, name: e.target.value })} /></label><label>类型<select value={nodeForm.type} onChange={(e) => setNodeForm({ ...nodeForm, type: e.target.value })}><option value="concept">概念</option><option value="skill">技能</option><option value="chapter">章节</option><option value="example">案例</option></select></label><label>定义<textarea value={nodeForm.definition} onChange={(e) => setNodeForm({ ...nodeForm, definition: e.target.value })} /></label><label>示例<textarea value={nodeForm.example} onChange={(e) => setNodeForm({ ...nodeForm, example: e.target.value })} /></label></details>
         <details className="surface"><summary><Link2 size={17} />关系编辑</summary><label>源知识点<select value={edgeForm.source} onChange={(e) => setEdgeForm({ ...edgeForm, source: e.target.value })}><option value="">请选择</option>{graph.nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}</select></label><label>目标知识点<select value={edgeForm.target} onChange={(e) => setEdgeForm({ ...edgeForm, target: e.target.value })}><option value="">请选择</option>{graph.nodes.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}</select></label><label>关系<select value={edgeForm.relation} onChange={(e) => { const relation = e.target.value as RelationType; setEdgeForm({ ...edgeForm, relation, label: relationLabels[relation] }); }}>{Object.entries(relationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="primary" onClick={saveEdge}><Link2 size={15} />建立关系</button><div className="compact-list">{graph.edges.slice(0, 8).map((edge) => <div key={edge.id}><span><b>{edge.label}</b><small>{nodeName(graph, edge.source)} → {nodeName(graph, edge.target)}</small></span><button title="删除关系" onClick={() => run(async () => { await api.deleteEdge(courseId, edge.id); await loadCourse(courseId); })}><Trash2 size={14} /></button></div>)}</div></details>
@@ -219,16 +222,196 @@ function ClassroomCenter({ run }: RunProps) {
   return <><PageHeading title="教学班级" description="一门课程可开设多个教学班，学生进度按班级独立保存。" /><div className="two-column"><section className="surface"><h3>我的班级</h3><div className="class-list">{classes.map((item) => <button className={selectedId === item.id ? 'active' : ''} key={item.id} onClick={() => setSelectedId(item.id)}><span><b>{item.name}</b><small>{item.course_name} · {item.semester}</small></span><strong>{item.student_count} 人</strong></button>)}</div><hr /><h3>新建教学班</h3><label>关联课程<select value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}>{courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>班级名称<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>学期<input value={form.semester} onChange={(e) => setForm({ ...form, semester: e.target.value })} /></label><button className="primary" onClick={() => run(async () => { await api.createClassroom(form); await load(); }, '教学班已创建。')}><Plus size={16} />创建教学班</button></section><section className="surface"><div className="surface-title"><div><h3>{selected?.name ?? '请选择班级'}</h3><p>主教师：{selected?.primary_teacher_name}</p></div>{selected && <div className="join-code"><span>班级码</span><b>{selected.join_code}</b><button title="重置班级码" onClick={() => run(async () => { await api.resetJoinCode(selected.id); await load(); }, '班级码已重置。')}><RefreshCw size={15} /></button></div>}</div><MetricGrid compact items={[['学生', selected?.student_count ?? 0], ['已激活', selected?.active_student_count ?? 0], ['教师', selected?.teacher_count ?? 0], ['平均进度', `${selected?.average_progress ?? 0}%`]]} /><div className="import-row"><label className="secondary file-button"><Upload size={16} />上传 CSV / XLSX<input type="file" accept=".csv,.xlsx" onChange={(e) => { const file = e.target.files?.[0]; if (file && selectedId) void run(async () => { setPreview(await api.previewImport(selectedId, file)); setResult(undefined); }); }} /></label>{preview && <span>有效 {preview.valid} 行，错误 {preview.invalid} 行</span>}{preview && <button className="primary" onClick={() => run(async () => setResult(await api.commitImport(preview.job_id)), '学生导入完成。')}>确认导入</button>}</div>{result && <div className="credentials"><b>临时账号仅展示一次</b>{result.credentials.map((item) => <code key={item.student_no}>{item.student_no} / {item.temporary_password}</code>)}</div>}<DataTable headers={['学号', '姓名', '邮箱', '状态']} rows={members.map((member) => [member.student_no || member.username, member.name, member.email || '-', member.account_status])} /></section></div></>;
 }
 
+const exerciseTypeOptions: ExerciseQuestionType[] = ['基础题', '应用题', '易错题'];
+const exerciseTypeDescriptions: Record<ExerciseQuestionType, string> = {
+  基础题: '检查概念、定义和基本用法',
+  应用题: '结合具体场景解决问题',
+  易错题: '识别常见误区并说明原因',
+};
+
 function StudentLearning({ run }: RunProps) {
-  const [classes, setClasses] = useState<Classroom[]>([]); const [classId, setClassId] = useState(''); const [joinCode, setJoinCode] = useState(''); const [graph, setGraph] = useState<KnowledgeGraph>(emptyGraph); const [selected, setSelected] = useState<KnowledgeNode>();
-  const [question, setQuestion] = useState('请解释这个知识点与前置知识的关系。'); const [answer, setAnswer] = useState<QAResult>(); const [path, setPath] = useState<LearningPathResult>(); const [diagnosis, setDiagnosis] = useState<DiagnosisResult>(); const [exercises, setExercises] = useState<ExerciseResult[]>([]);
+  const [classes, setClasses] = useState<Classroom[]>([]);
+  const [classId, setClassId] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [graph, setGraph] = useState<KnowledgeGraph>(emptyGraph);
+  const [selected, setSelected] = useState<KnowledgeNode>();
+  const [question, setQuestion] = useState('请解释这个知识点与前置知识的关系。');
+  const [answer, setAnswer] = useState<QAResult>();
+  const [path, setPath] = useState<LearningPathResult>();
+  const [diagnosis, setDiagnosis] = useState<DiagnosisResult>();
+  const [exercises, setExercises] = useState<ExerciseResult[]>([]);
   const [aiStatus, setAiStatus] = useState<AIStatus>();
-  const loadClasses = useCallback(async () => { const data = await api.listClassrooms(); setClasses(data); setClassId((old) => data.some((c) => c.id === old) ? old : data[0]?.id ?? ''); }, []);
-  const loadGraph = useCallback(async (id: string) => { if (!id) { setGraph(emptyGraph); return; } const data = await api.classGraph(id); setGraph(data); setSelected((old) => data.nodes.find((n) => n.id === old?.id) ?? data.nodes[0]); }, []);
-  useEffect(() => { void run(loadClasses); }, [loadClasses, run]); useEffect(() => { void run(() => loadGraph(classId)); }, [classId, loadGraph, run]); useEffect(() => { void run(async () => setAiStatus(await api.aiStatus())); }, [run]);
-  const classroom = classes.find((item) => item.id === classId); const mastered = graph.nodes.filter((n) => n.mastered).length;
+  const [exerciseModal, setExerciseModal] = useState(false);
+  const [exerciseStage, setExerciseStage] = useState<'config' | 'results'>('config');
+  const [exerciseTypes, setExerciseTypes] = useState<ExerciseQuestionType[]>(exerciseTypeOptions);
+  const [exerciseCount, setExerciseCount] = useState(3);
+  const [exerciseLoading, setExerciseLoading] = useState(false);
+
+  const loadClasses = useCallback(async () => {
+    const data = await api.listClassrooms();
+    setClasses(data);
+    setClassId((old) => data.some((item) => item.id === old) ? old : data[0]?.id ?? '');
+  }, []);
+
+  const loadGraph = useCallback(async (id: string) => {
+    if (!id) { setGraph(emptyGraph); return; }
+    const data = await api.classGraph(id);
+    setGraph(data);
+    setSelected((old) => data.nodes.find((node) => node.id === old?.id) ?? data.nodes[0]);
+  }, []);
+
+  useEffect(() => { void run(loadClasses); }, [loadClasses, run]);
+  useEffect(() => { void run(() => loadGraph(classId)); }, [classId, loadGraph, run]);
+  useEffect(() => { void run(async () => setAiStatus(await api.aiStatus())); }, [run]);
+
+  const classroom = classes.find((item) => item.id === classId);
+  const mastered = graph.nodes.filter((node) => node.mastered).length;
   const pathEdgeIds = useMemo(() => path?.path_edges.map((edge) => edge.id) ?? emptyPathEdgeIds, [path]);
-  return <><PageHeading title="学习空间" description="这里只显示你已加入且正在开课的教学班。" actions={<div className="join-form"><input placeholder="输入班级码" value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} /><button className="secondary" onClick={() => run(async () => { await api.joinClass(joinCode); setJoinCode(''); await loadClasses(); }, '已加入班级。')}><Plus size={16} />加入班级</button></div>} />{!classes.length ? <EmptyState icon={School} title="还没有加入教学班" text="向任课教师获取班级码，加入后即可查看课程图谱。" /> : <><div className="student-toolbar"><select value={classId} onChange={(e) => setClassId(e.target.value)}>{classes.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.course_name}</option>)}</select><span>{classroom?.semester}</span><b>{mastered}/{graph.nodes.length} 已掌握</b><span className={`ai-mode compact ${aiStatus?.configured ? 'online' : 'offline'}`}>{aiStatus?.configured ? 'DeepSeek 真 AI' : '离线演示'}</span></div><div className="learning-grid"><section className="surface graph-workspace"><GraphView graph={graph} selectedNodeId={selected?.id} pathEdgeIds={pathEdgeIds} onSelectNode={setSelected} /></section><aside className="learning-side"><section className="surface"><h3>知识点详情</h3>{selected ? <><span className="node-type">{selected.type}</span><h2>{selected.name}</h2><p>{selected.definition}</p><small>{selected.example}</small><button className={selected.mastered ? 'secondary wide' : 'primary wide'} onClick={() => run(async () => { await api.classProgress(classId, selected.id, !selected.mastered); await loadGraph(classId); }, selected.mastered ? '已取消掌握标记。' : '学习进度已更新。')}>{selected.mastered ? '取消掌握' : '标记为已掌握'}</button></> : <p>点击图谱节点查看内容。</p>}</section><section className="surface"><h3><Route size={17} />个性化学习建议</h3><div className="button-row"><button className="secondary" onClick={() => run(async () => setDiagnosis(await api.diagnosis(classId)))}>学习诊断</button><button className="secondary" onClick={() => run(async () => setPath(await api.classPath(classId)))}>推荐路径</button><button className="secondary" onClick={() => run(async () => setExercises(await api.exercises(classId)))}>生成练习</button></div>{diagnosis && <div className="diagnosis"><b>掌握率 {diagnosis.mastery_rate}% · {diagnosis.mode}</b><p>{diagnosis.ai_analysis}</p>{diagnosis.suggestions.map((s) => <p key={s}>{s}</p>)}</div>}{path?.ai_summary && <div className="diagnosis"><b>{path.mode}</b><p>{path.ai_summary}</p></div>}{path?.recommendations.map((item) => <div className="path-item" key={item.node.id}><b>{item.node.name}</b><span>{item.reason}</span></div>)}{exercises.map((item) => <details className="exercise" key={`${item.node_id}-${item.question_type}`}><summary>{item.question_type} · {item.difficulty}｜{item.question}</summary><p>{item.answer}</p><small>{item.explanation}</small>{item.sources.map((source, index) => <small key={`${source.source}-${index}`}>来源：{source.source}</small>)}</details>)}</section><section className="surface"><h3><Bot size={17} />可溯源问答</h3><textarea value={question} onChange={(e) => setQuestion(e.target.value)} /><button className="primary" onClick={() => run(async () => setAnswer(await api.classQa(classId, question)), '已基于课程证据生成回答。')}><Send size={15} />提问</button>{answer && <div className="answer"><p>{answer.answer}</p><div className="answer-meta"><span>{answer.mode}</span><span>置信度 {answer.confidence}</span></div>{answer.evidence.map((e, index) => <details key={`${e.source}-${index}`}><summary>[{index + 1}] {e.source}</summary><small>{e.excerpt}</small></details>)}</div>}</section></aside></div></>}</>;
+
+  const toggleExerciseType = (type: ExerciseQuestionType) => {
+    setExerciseTypes((current) => current.includes(type)
+      ? current.filter((item) => item !== type)
+      : [...current, type]);
+  };
+
+  const openExerciseModal = () => {
+    setExerciseStage(exercises.length ? 'results' : 'config');
+    setExerciseModal(true);
+  };
+
+  const generateExercises = () => {
+    if (!exerciseTypes.length) return;
+    void run(async () => {
+      setExerciseLoading(true);
+      try {
+        const generated = await api.exercises(classId, { question_types: exerciseTypes, count: exerciseCount });
+        setExercises(generated);
+        setExerciseStage('results');
+      } finally {
+        setExerciseLoading(false);
+      }
+    }, '练习已按所选题型和题量生成。');
+  };
+
+  const askQuestion = () => {
+    const contextualQuestion = selected
+      ? '当前知识点：' + selected.name + '\n学生问题：' + question
+      : question;
+    void run(async () => setAnswer(await api.classQa(classId, contextualQuestion)), '已基于课程图谱和 AI 通用知识生成回答。');
+  };
+
+  return <>
+    <PageHeading
+      title="学习空间"
+      description="这里只显示你已加入且正在开课的教学班。"
+      actions={<div className="join-form"><input placeholder="输入班级码" value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} /><button className="secondary" onClick={() => run(async () => { await api.joinClass(joinCode); setJoinCode(''); await loadClasses(); }, '已加入班级。')}><Plus size={16} />加入班级</button></div>}
+    />
+    {!classes.length ? (
+      <EmptyState icon={School} title="还没有加入教学班" text="向任课教师获取班级码，加入后即可查看课程图谱。" />
+    ) : <>
+      <div className="student-toolbar">
+        <select value={classId} onChange={(event) => setClassId(event.target.value)}>
+          {classes.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.course_name}</option>)}
+        </select>
+        <span>{classroom?.semester}</span>
+        <b>{mastered}/{graph.nodes.length} 已掌握</b>
+        <span className={'ai-mode compact ' + (aiStatus?.configured ? 'online' : 'offline')}>{aiStatus?.configured ? 'DeepSeek 真 AI' : '本地规则'}</span>
+      </div>
+
+      <div className="learning-grid">
+        <section className="surface graph-workspace">
+          <GraphView graph={graph} selectedNodeId={selected?.id} pathEdgeIds={pathEdgeIds} onSelectNode={setSelected} />
+        </section>
+
+        <aside className="learning-side">
+          <section className="surface">
+            <h3>知识点详情</h3>
+            {selected ? <>
+              <span className="node-type">{selected.type}</span>
+              <h2>{selected.name}</h2>
+              <p>{selected.definition}</p>
+              <small>{selected.example}</small>
+              <button className={selected.mastered ? 'secondary wide' : 'primary wide'} onClick={() => run(async () => { await api.classProgress(classId, selected.id, !selected.mastered); await loadGraph(classId); }, selected.mastered ? '已取消掌握标记。' : '学习进度已更新。')}>{selected.mastered ? '取消掌握' : '标记为已掌握'}</button>
+            </> : <p>点击图谱节点查看内容。</p>}
+          </section>
+
+          <section className="surface">
+            <h3><Route size={17} />个性化学习建议</h3>
+            <div className="button-row">
+              <button className="secondary" onClick={() => run(async () => setDiagnosis(await api.diagnosis(classId)))}>学习诊断</button>
+              <button className="secondary" onClick={() => run(async () => setPath(await api.classPath(classId)))}>推荐路径</button>
+              <button className="secondary" onClick={openExerciseModal}>生成练习</button>
+            </div>
+
+            {diagnosis && <div className="insight-result">
+              <button className="result-close" title="关闭学习诊断" aria-label="关闭学习诊断" onClick={() => setDiagnosis(undefined)}><X size={15} /></button>
+              <b>掌握率 {diagnosis.mastery_rate}% · {diagnosis.mode}</b>
+              <p>{diagnosis.ai_analysis}</p>
+              {diagnosis.suggestions.map((suggestion) => <p key={suggestion}>{suggestion}</p>)}
+            </div>}
+
+            {path && <div className="insight-result">
+              <button className="result-close" title="关闭推荐路径" aria-label="关闭推荐路径" onClick={() => setPath(undefined)}><X size={15} /></button>
+              {path.ai_summary && <><b>{path.mode}</b><p>{path.ai_summary}</p></>}
+              {path.recommendations.map((item) => <div className="path-item" key={item.node.id}><b>{item.node.name}</b><span>{item.reason}</span></div>)}
+            </div>}
+          </section>
+
+          <section className="surface">
+            <h3><Bot size={17} />可溯源问答</h3>
+            <textarea value={question} onChange={(event) => setQuestion(event.target.value)} />
+            <button className="primary" onClick={askQuestion}><Send size={15} />提问</button>
+            {answer && <div className="answer">
+              <p>{answer.answer}</p>
+              <div className="answer-meta"><span>{answer.mode}</span><span>置信度 {answer.confidence}</span></div>
+              {answer.evidence.map((item, index) => <details key={(item.source || 'evidence') + index}><summary>[{index + 1}] {item.source}</summary><small>{item.excerpt}</small></details>)}
+            </div>}
+          </section>
+        </aside>
+      </div>
+    </>}
+
+    {exerciseModal && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="生成练习">
+      <section className="modal exercise-modal">
+        <div className="modal-title">
+          <div><h3>{exerciseStage === 'config' ? '生成个性化练习' : '练习题'}</h3><p>{classroom?.course_name}</p></div>
+          <button title="关闭练习窗口" aria-label="关闭练习窗口" onClick={() => setExerciseModal(false)}><X size={18} /></button>
+        </div>
+
+        {exerciseStage === 'config' ? <>
+          <div className="exercise-config-heading"><b>选择题型</b><button onClick={() => setExerciseTypes([...exerciseTypeOptions])}>全部选择</button></div>
+          <div className="exercise-type-grid">
+            {exerciseTypeOptions.map((type) => <label className={'exercise-type-option ' + (exerciseTypes.includes(type) ? 'selected' : '')} key={type}>
+              <input type="checkbox" checked={exerciseTypes.includes(type)} onChange={() => toggleExerciseType(type)} />
+              <span><b>{type}</b><small>{exerciseTypeDescriptions[type]}</small></span>
+            </label>)}
+          </div>
+          {!exerciseTypes.length && <p className="form-error">请至少选择一种题型。</p>}
+          <label className="exercise-count">题目数量
+            <select value={exerciseCount} onChange={(event) => setExerciseCount(Number(event.target.value))}>
+              {Array.from({ length: 10 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count} 道</option>)}
+            </select>
+          </label>
+          <div className="modal-actions">
+            <button className="secondary" onClick={() => setExerciseModal(false)}>取消</button>
+            <button className="primary" disabled={!exerciseTypes.length || exerciseLoading} onClick={generateExercises}><Bot size={16} />{exerciseLoading ? '正在生成…' : '开始生成'}</button>
+          </div>
+        </> : <>
+          <div className="exercise-result-summary"><span>{exerciseTypes.join('、')}</span><b>{exercises.length} 道</b></div>
+          <div className="exercise-results">
+            {exercises.map((item, index) => <details className="exercise" key={item.node_id + '-' + item.question_type + '-' + index}>
+              <summary><span>{index + 1}. {item.question_type} · {item.difficulty}</span>{item.question}</summary>
+              <div className="exercise-answer"><b>参考答案</b><p>{item.answer}</p><small>{item.explanation}</small></div>
+            </details>)}
+          </div>
+          <div className="modal-actions">
+            <button className="secondary" onClick={() => setExerciseStage('config')}>重新设置</button>
+            <button className="primary" onClick={() => setExerciseModal(false)}>完成</button>
+          </div>
+        </>}
+      </section>
+    </div>}
+  </>;
 }
 
 function AdminOverview({ run }: RunProps) {

@@ -52,7 +52,7 @@ def create_extraction_job(course_id: str, user: User) -> ExtractionJob:
             """,
             (
                 job_id, course_id, user.id, json.dumps([row["id"] for row in documents]), mode,
-                "等待知识抽取" if mode == "deepseek" else "离线演示模式：等待 Mock 抽取",
+                "等待知识抽取" if mode == "deepseek" else "本地规则模式：等待知识抽取",
             ),
         )
         _audit(connection, user, "extraction.create", "course", course_id, {"job_id": job_id, "mode": mode})
@@ -79,7 +79,7 @@ def process_extraction_job(job_id: str) -> None:
             ).fetchall()]
             connection.execute(
                 "UPDATE extraction_jobs SET status = 'extracting', progress = 45, message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                ("正在调用 DeepSeek 进行结构化抽取" if job["mode"] == "deepseek" else "正在运行离线 Mock 抽取", job_id),
+                ("正在调用 DeepSeek 进行结构化抽取" if job["mode"] == "deepseek" else "正在运行本地规则抽取", job_id),
             )
         extraction_warnings: list[str] = []
         extracted_graph = deepseek.extract_graph(course["name"], documents, warnings=extraction_warnings)

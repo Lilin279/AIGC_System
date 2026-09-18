@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知元智学 · 学习导航工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --aurora-violet:#7C6CF0;--aurora-cyan:#3FB8E8;--aurora-rose:#F87BA6;--aurora-amber:#F5B26B;
+  --primary:#6D5EF0;--primary-deep:#4A3ED6;--primary-soft:rgba(109,94,240,.12);
+  --ink:#23263B;--ink-soft:#5C617F;--ink-faint:#9BA0B8;--bg:#F2F4FB;
+  --success:#12A87B;--warning:#E8930C;--error:#E5484D;
+  --glass:rgba(255,255,255,.58);--glass-strong:rgba(255,255,255,.78);
+  --glass-border:rgba(255,255,255,.72);
+  --glass-shadow:0 8px 32px rgba(63,63,110,.10),0 1.5px 0 rgba(255,255,255,.9) inset;
+  --r-sm:10px;--r-md:16px;--r-lg:22px;--r-xl:30px;--r-full:999px;
+  --s4:16px;--s5:24px;
+  --font-display:'Sora','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --ease-out:cubic-bezier(.22,1,.36,1);--t-fast:160ms var(--ease-out);--t-normal:320ms var(--ease-out);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-body);color:var(--ink);background:var(--bg);min-height:100vh;line-height:1.7;-webkit-font-smoothing:antialiased}
+.aurora{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.aurora i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5}
+.aurora i:nth-child(1){width:640px;height:640px;background:var(--aurora-violet);top:-240px;left:-160px;animation:d1 26s ease-in-out infinite alternate}
+.aurora i:nth-child(2){width:540px;height:540px;background:var(--aurora-cyan);top:-140px;right:-180px;animation:d2 30s ease-in-out infinite alternate}
+.aurora i:nth-child(3){width:560px;height:560px;background:var(--aurora-rose);bottom:-280px;left:30%;opacity:.34;animation:d3 34s ease-in-out infinite alternate}
+@keyframes d1{to{transform:translate(80px,60px) scale(1.12)}}
+@keyframes d2{to{transform:translate(-70px,90px) scale(.94)}}
+@keyframes d3{to{transform:translate(60px,-70px) scale(1.08)}}
+
+.glass{background:var(--glass);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow)}
+
+/* ============ Shell ============ */
+.shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+
+/* Sidebar */
+aside{
+  position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;
+  padding:28px 18px;
+  background:rgba(255,255,255,.5);
+  backdrop-filter:blur(28px) saturate(1.6);
+  -webkit-backdrop-filter:blur(28px) saturate(1.6);
+  border-right:1px solid var(--glass-border);
+}
+.logo{display:flex;align-items:center;gap:12px;padding:0 10px 26px}
+.logo .mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-cyan));display:grid;place-items:center;color:#fff;box-shadow:0 8px 18px rgba(109,94,240,.35);flex-shrink:0}
+.logo b{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-.01em;display:block;line-height:1.3}
+.logo span{font-size:10px;color:var(--ink-faint);letter-spacing:.16em}
+.nav-label{font-size:11px;color:var(--ink-faint);letter-spacing:.12em;padding:16px 12px 8px}
+.nav a{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 12px;margin-bottom:2px;
+  border-radius:12px;text-decoration:none;
+  color:var(--ink-soft);font-size:14px;font-weight:500;
+  transition:all var(--t-fast);position:relative;
+}
+.nav a svg{width:19px;height:19px;flex-shrink:0;opacity:.8}
+.nav a:hover{background:rgba(255,255,255,.7);color:var(--ink)}
+.nav a.active{background:linear-gradient(120deg,rgba(109,94,240,.16),rgba(63,184,232,.14));color:var(--primary-deep);font-weight:700}
+.nav a.active::before{content:"";position:absolute;left:-18px;top:22%;bottom:22%;width:4px;border-radius:0 4px 4px 0;background:linear-gradient(180deg,var(--aurora-violet),var(--aurora-cyan))}
+.nav a .tag{margin-left:auto;font-size:10px;font-weight:600;color:#fff;background:linear-gradient(120deg,var(--aurora-rose),var(--aurora-amber));padding:2px 8px;border-radius:99px}
+.side-foot{margin-top:auto;padding:14px;border-radius:var(--r-md);background:rgba(255,255,255,.6);border:1px solid var(--glass-border)}
+.side-foot .row{display:flex;align-items:center;gap:10px;font-size:13px}
+.side-foot .row b{font-size:18px;font-family:var(--font-display)}
+.side-foot p{font-size:11px;color:var(--ink-faint);margin-top:2px}
+
+/* Main */
+main{padding:26px 34px 60px;min-width:0}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:26px}
+.search{flex:1;max-width:430px;display:flex;align-items:center;gap:10px;padding:11px 18px;border-radius:var(--r-full);background:rgba(255,255,255,.6);border:1px solid var(--glass-border);backdrop-filter:blur(18px)}
+.search svg{width:17px;height:17px;color:var(--ink-faint);flex-shrink:0}
+.search input{flex:1;border:none;outline:none;background:transparent;font-family:var(--font-body);font-size:14px;color:var(--ink)}
+.search input::placeholder{color:var(--ink-faint)}
+.search kbd{font-family:var(--font-display);font-size:10px;color:var(--ink-faint);border:1px solid rgba(92,97,127,.25);border-radius:6px;padding:2px 7px}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
+.icon-btn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:var(--ink-soft);background:rgba(255,255,255,.6);border:1px solid var(--glass-border);cursor:pointer;position:relative;transition:all var(--t-fast)}
+.icon-btn:hover{transform:translateY(-2px);background:#fff}
+.icon-btn svg{width:18px;height:18px}
+.icon-btn .dot{position:absolute;top:10px;right:11px;width:7px;height:7px;border-radius:50%;background:var(--aurora-rose);box-shadow:0 0 0 2px #fff}
+.avatar{display:flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border-radius:var(--r-full);background:rgba(255,255,255,.6);border:1px solid var(--glass-border)}
+.avatar img{width:34px;height:34px;border-radius:50%;display:block}
+.avatar b{font-size:13px}
+.avatar small{display:block;font-size:10px;color:var(--ink-faint);line-height:1.2}
+
+/* Hero */
+.hero{
+  position:relative;overflow:hidden;
+  border-radius:var(--r-xl);padding:30px 34px;
+  background:linear-gradient(120deg,rgba(124,108,240,.92),rgba(63,184,232,.88));
+  color:#fff;box-shadow:0 18px 46px rgba(109,94,240,.35);
+  display:flex;align-items:center;gap:28px;flex-wrap:wrap;margin-bottom:22px;
+}
+.hero::after{content:"";position:absolute;inset:0;background:
+  radial-gradient(420px 220px at 88% -20%,rgba(255,255,255,.35),transparent),
+  radial-gradient(300px 200px at 60% 130%,rgba(248,123,166,.4),transparent);pointer-events:none}
+.hero .ring{position:relative;flex-shrink:0;width:128px;height:128px}
+.hero .ring svg{transform:rotate(-90deg)}
+.hero .ring .val{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.hero .ring .val b{font-family:var(--font-display);font-size:28px;font-weight:800;line-height:1.1}
+.hero .ring .val span{font-size:11px;opacity:.85}
+.hero .copy{flex:1;min-width:260px;position:relative;z-index:1}
+.hero .copy .hello{font-size:13px;opacity:.9;letter-spacing:.06em}
+.hero .copy h1{font-family:var(--font-display);font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;margin:4px 0 8px}
+.hero .copy p{font-size:14px;opacity:.92;max-width:52ch}
+.hero .cta{display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;position:relative;z-index:1}
+.hero .cta .primary{padding:12px 26px;border-radius:var(--r-full);font-weight:700;font-size:14px;color:var(--primary-deep);background:#fff;box-shadow:0 10px 24px rgba(20,20,60,.25);border:none;cursor:pointer;transition:transform var(--t-fast),box-shadow var(--t-fast);display:inline-flex;gap:8px;align-items:center}
+.hero .cta .primary:hover{transform:translateY(-2px)}
+.hero .cta .ghost{padding:12px 22px;border-radius:var(--r-full);font-size:14px;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.5);cursor:pointer;backdrop-filter:blur(8px);transition:background var(--t-fast)}
+.hero .cta .ghost:hover{background:rgba(255,255,255,.3)}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
+.stat{border-radius:var(--r-lg);padding:20px;position:relative;overflow:hidden;transition:transform var(--t-normal),box-shadow var(--t-normal)}
+.stat:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(63,63,110,.16),var(--glass-shadow)}
+.stat .ico{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;margin-bottom:12px}
+.stat .ico svg{width:19px;height:19px}
+.stat b{font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-.02em;display:block;line-height:1.2}
+.stat b small{font-size:13px;font-weight:600;color:var(--ink-faint);margin-left:2px}
+.stat span{font-size:12.5px;color:var(--ink-soft)}
+.stat .trend{position:absolute;top:18px;right:18px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px}
+.t-up{color:#0B7A59;background:rgba(18,168,123,.13)}
+.t-warn{color:#9A6207;background:rgba(232,147,12,.14)}
+
+/* Section head */
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:30px 0 16px}
+.sec h2{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.sec h2 em{font-style:normal;width:7px;height:22px;border-radius:4px;background:linear-gradient(180deg,var(--aurora-violet),var(--aurora-cyan))}
+.sec a{font-size:13px;color:var(--primary-deep);text-decoration:none;font-weight:500}
+.sec a:hover{text-decoration:underline}
+
+/* Learning path */
+.path-card{border-radius:var(--r-xl);padding:26px 22px 16px;overflow:hidden}
+.path-scroller{overflow-x:auto;padding-bottom:10px;scrollbar-width:thin}
+.path{display:flex;align-items:flex-start;min-width:760px}
+.pnode{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative}
+.pnode .dot{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-size:15px;position:relative;z-index:2;transition:transform var(--t-normal)}
+.pnode:hover .dot{transform:scale(1.1)}
+.pnode.done .dot{background:linear-gradient(135deg,#12A87B,#3FB8E8);color:#fff;box-shadow:0 8px 18px rgba(18,168,123,.35)}
+.pnode.now .dot{background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-cyan));color:#fff;box-shadow:0 8px 20px rgba(109,94,240,.4)}
+.pnode.now .dot::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(109,94,240,.4);animation:pulse 2.2s var(--ease-out) infinite}
+@keyframes pulse{0%{transform:scale(.9);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.pnode.todo .dot{background:rgba(255,255,255,.85);color:var(--ink-faint);border:1.5px dashed rgba(92,97,127,.35)}
+.pnode b{font-size:13px;margin-top:12px;font-weight:700;line-height:1.4}
+.pnode span{font-size:11px;color:var(--ink-faint);margin-top:2px}
+.pnode .pct{margin-top:8px;font-size:11px;font-family:var(--font-display);font-weight:700;padding:2px 10px;border-radius:99px}
+.pnode.done .pct{color:#0B7A59;background:rgba(18,168,123,.12)}
+.pnode.now .pct{color:var(--primary-deep);background:var(--primary-soft)}
+.pnode.todo .pct{color:var(--ink-faint);background:rgba(92,97,127,.1)}
+.pnode::before{content:"";position:absolute;top:27px;left:-50%;width:100%;height:2.5px;background:repeating-linear-gradient(90deg,rgba(92,97,127,.3) 0 7px,transparent 7px 13px)}
+.pnode.done::before{background:linear-gradient(90deg,#12A87B,#3FB8E8);height:3px}
+.pnode.now::before{background:linear-gradient(90deg,#12A87B,var(--aurora-violet))}
+.pnode:first-child::before{display:none}
+
+/* Two column */
+.cols{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+.card{border-radius:var(--r-xl);padding:24px}
+
+.mrow{display:flex;align-items:center;gap:14px;padding:12px 4px;border-bottom:1px dashed rgba(92,97,127,.16)}
+.mrow:last-child{border-bottom:0}
+.mrow .name{flex:1;min-width:0}
+.mrow .name b{font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow .name span{font-size:11px;color:var(--ink-faint)}
+.mrow .bar{width:150px;flex-shrink:0}
+.mrow .bar .progress{height:7px;border-radius:99px;background:rgba(92,97,127,.13);overflow:hidden}
+.mrow .bar .progress i{display:block;height:100%;border-radius:99px}
+.mrow .pctv{width:44px;text-align:right;font-family:var(--font-display);font-weight:700;font-size:14px;flex-shrink:0}
+
+/* AI advisor */
+.ai-card{border-radius:var(--r-xl);overflow:hidden}
+.ai-head{padding:18px 24px;background:linear-gradient(120deg,rgba(124,108,240,.15),rgba(63,184,232,.13));border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:12px}
+.ai-head .face{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-rose));display:grid;place-items:center;color:#fff;flex-shrink:0}
+.ai-head b{font-size:14px;display:block}
+.ai-head span{font-size:11px;color:var(--ink-faint)}
+.ai-body{padding:18px 24px 22px}
+.ai-msg{font-size:13.5px;color:var(--ink-soft);padding:12px 16px;border-radius:4px 16px 16px 16px;background:rgba(255,255,255,.75);border:1px solid var(--glass-border);margin-bottom:14px;line-height:1.75}
+.ai-msg strong{color:var(--ink)}
+.ai-acts{display:flex;flex-direction:column;gap:8px}
+.ai-act{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;background:rgba(255,255,255,.6);border:1px solid var(--glass-border);font-size:13px;text-decoration:none;color:var(--ink);transition:all var(--t-fast)}
+.ai-act:hover{transform:translateX(4px);background:#fff}
+.ai-act .n{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:12px;color:#fff;flex-shrink:0}
+.ai-act small{margin-left:auto;color:var(--ink-faint);flex-shrink:0}
+
+/* Resources */
+.res{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.rcard{border-radius:var(--r-lg);overflow:hidden;transition:transform var(--t-normal),box-shadow var(--t-normal);text-decoration:none;color:var(--ink);display:flex;flex-direction:column}
+.rcard:hover{transform:translateY(-5px);box-shadow:0 20px 44px rgba(63,63,110,.18),var(--glass-shadow)}
+.rcard .cover{height:118px;display:grid;place-items:center;position:relative;overflow:hidden}
+.rcard .cover svg{width:34px;height:34px;color:rgba(255,255,255,.92)}
+.rcard .cover .dur{position:absolute;right:12px;bottom:10px;font-size:10.5px;font-weight:600;color:#fff;background:rgba(15,15,40,.35);padding:3px 9px;border-radius:99px;backdrop-filter:blur(6px)}
+.rcard .body{padding:16px 18px 18px;flex:1;display:flex;flex-direction:column;gap:6px}
+.rcard .body b{font-family:var(--font-display);font-size:15px;font-weight:700}
+.rcard .body p{font-size:12.5px;color:var(--ink-soft);flex:1}
+.rcard .body .foot{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--ink-faint);margin-top:8px}
+.rcard .body .foot .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px}
+.badge i{width:5px;height:5px;border-radius:50%;font-style:normal}
+.bg-mastered{background:rgba(18,168,123,.13);color:#0B7A59}.bg-mastered i{background:var(--success)}
+.bg-learning{background:var(--primary-soft);color:var(--primary-deep)}.bg-learning i{background:var(--primary)}
+.bg-todo{background:rgba(92,97,127,.12);color:var(--ink-soft)}.bg-todo i{background:var(--ink-faint)}
+
+/* Responsive */
+@media(max-width:1080px){.stats{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}.res{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:860px){
+  .shell{grid-template-columns:1fr}
+  aside{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;gap:6px;padding:14px 18px}
+  .logo{padding:0 14px 0 0}
+  .nav{display:flex;flex-wrap:wrap;gap:2px}
+  .nav-label,.nav a .tag,.side-foot{display:none}
+  .nav a{padding:8px 12px}
+  .nav a.active::before{display:none}
+  main{padding:20px 18px 50px}
+  .search kbd{display:none}
+}
+@media(max-width:620px){.stats,.res{grid-template-columns:1fr}.hero{padding:24px}}
+</style>
+</head>
+<body>
+<div class="aurora"><i></i><i></i><i></i></div>
+
+<div class="shell">
+  <!-- ===== Sidebar ===== -->
+  <aside>
+    <div class="logo">
+      <div class="mark">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2.4" fill="currentColor"/><circle cx="5" cy="17" r="2.4" fill="currentColor"/><circle cx="19" cy="17" r="2.4" fill="currentColor"/><path d="M12 7.4 6.4 15M12 7.4 17.6 15M7.4 17h9.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".75"/></svg>
+      </div>
+      <div><b>知元智学</b><span>KNOWVERSE</span></div>
+    </div>
+    <nav class="nav">
+      <a href="#" class="active" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>
+        学习导航
+      </a>
+      <a href="knowledge-graph.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="4.5" r="2.2"/><circle cx="4.5" cy="16" r="2.2"/><circle cx="19.5" cy="16" r="2.2"/><circle cx="12" cy="13" r="2.6"/><path d="M10.5 6.3 7 14.2M13.5 6.3 17 14.2M6.7 16h10.6M10.4 14.5l.7-1.2M13.6 14.5l-.7-1.2"/></svg>
+        知识图谱
+      </a>
+      <a href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/></svg>
+        我的课程
+      </a>
+      <div class="nav-label">教师端</div>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7.5l9 4.5 9-4.5z"/><path d="M6.5 10v5.5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3V10"/></svg>图谱构建 <span class="tag">AIGC</span></a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.9.7 1.5 1.3 1.5 2.1h4c0-.8.6-1.4 1.5-2.1A6 6 0 0 0 12 3z"/></svg>AI 出题</a>
+      <div class="nav-label">分析</div>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>学情洞察</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5"/></svg>个人中心</a>
+    </nav>
+    <div class="side-foot">
+      <div class="row"><b style="background:linear-gradient(100deg,var(--aurora-violet),var(--aurora-cyan));-webkit-background-clip:text;background-clip:text;color:transparent">86%</b><span style="color:var(--ink-soft)">《数据结构》<br>图谱覆盖</span></div>
+      <p>较上周 +6% · 保持节奏！</p>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main>
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" placeholder="搜索知识点、课程或资源…" aria-label="全局搜索">
+        <kbd>⌘K</kbd>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" aria-label="消息通知">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 15 18 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg>
+          <span class="dot"></span>
+        </button>
+        <div class="avatar">
+          <img src="https://api.dicebear.com/9.x/thumbs/svg?seed=L16&backgroundColor=c0aede,ffd5dc,b6e3f4" alt="用户头像">
+          <div><b>林同学</b><small>计算机科学 · 大二</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <section class="hero" aria-label="学习概览">
+      <div class="ring" role="img" aria-label="图谱覆盖率 86%">
+        <svg width="128" height="128" viewBox="0 0 128 128">
+          <circle cx="64" cy="64" r="54" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="11"/>
+          <circle cx="64" cy="64" r="54" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round"
+                  stroke-dasharray="339.3" stroke-dashoffset="47.5">
+            <animate attributeName="stroke-dashoffset" from="339.3" to="47.5" dur="1.4s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1"/>
+          </circle>
+        </svg>
+        <div class="val"><div><b>86%</b><span>图谱覆盖率</span></div></div>
+      </div>
+      <div class="copy">
+        <p class="hello">周三下午好，林同学 ☀️</p>
+        <h1>再掌握 14 个知识点，即可点亮「图论」章节</h1>
+        <p>AI 助教根据你的测验记录调整了本周路径：优先巩固「最短路径」的两个薄弱前置点，预计 1 小时 20 分钟完成。</p>
+        <div class="cta">
+          <button class="primary">继续学习
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <button class="ghost">查看完整图谱</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats" aria-label="学习数据">
+      <div class="stat glass">
+        <div class="ico" style="background:rgba(18,168,123,.13);color:#0B7A59"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <b>128<small>个</small></b><span>已掌握知识点</span>
+        <span class="trend t-up">+9 本周</span>
+      </div>
+      <div class="stat glass">
+        <div class="ico" style="background:var(--primary-soft);color:var(--primary-deep)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
+        <b>42.5<small>小时</small></b><span>累计学习时长</span>
+        <span class="trend t-up">+3.2h</span>
+      </div>
+      <div class="stat glass">
+        <div class="ico" style="background:rgba(248,123,166,.16);color:#C2416B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2s5 4.5 5 9a5 5 0 0 1-10 0c0-1.6.8-3.2 1.7-4.5C9.6 5 12 2 12 2z"/></svg></div>
+        <b>21<small>天</small></b><span>连续学习打卡</span>
+        <span class="trend t-warn">历史最佳 30</span>
+      </div>
+      <div class="stat glass">
+        <div class="ico" style="background:rgba(245,178,107,.18);color:#A6631A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="m7 14 4-4 3 3 5-6"/></svg></div>
+        <b>92<small>分</small></b><span>上周测验平均分</span>
+        <span class="trend t-up">+4</span>
+      </div>
+    </section>
+
+    <!-- Learning path -->
+    <div class="sec">
+      <h2><em></em>本周学习路径 · 图论基础</h2>
+      <a href="#">调整计划</a>
+    </div>
+    <section class="path-card glass" aria-label="学习路径">
+      <div class="path-scroller">
+        <div class="path">
+          <div class="pnode done"><div class="dot">✓</div><b>图的基本概念</b><span>周一 · 已完成</span><span class="pct">100%</span></div>
+          <div class="pnode done"><div class="dot">✓</div><b>图的存储结构</b><span>周二 · 已完成</span><span class="pct">100%</span></div>
+          <div class="pnode now"><div class="dot">3</div><b>深度优先搜索</b><span>今天 · 进行中</span><span class="pct">62%</span></div>
+          <div class="pnode todo"><div class="dot">4</div><b>广度优先搜索</b><span>周四 · 待开始</span><span class="pct">0%</span></div>
+          <div class="pnode todo"><div class="dot">5</div><b>拓扑排序</b><span>周五 · 待开始</span><span class="pct">0%</span></div>
+          <div class="pnode todo"><div class="dot">6</div><b>最短路径</b><span>周日 · 待开始</span><span class="pct">0%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mastery + AI -->
+    <div class="sec">
+      <h2><em></em>知识点掌握度 · 近期章节</h2>
+      <a href="#">查看全部</a>
+    </div>
+    <div class="cols">
+      <section class="card glass" aria-label="掌握度列表">
+        <div class="mrow">
+          <div class="name"><b>深度优先搜索 DFS</b><span>图论 · 薄弱前置点已补</span></div>
+          <div class="bar"><div class="progress"><i style="width:62%;background:linear-gradient(90deg,#7C6CF0,#3FB8E8)"></i></div></div>
+          <span class="pctv" style="color:var(--primary-deep)">62%</span>
+        </div>
+        <div class="mrow">
+          <div class="name"><b>队列与广度优先</b><span>图论 · 前置依赖</span></div>
+          <div class="bar"><div class="progress"><i style="width:88%;background:linear-gradient(90deg,#12A87B,#3FB8E8)"></i></div></div>
+          <span class="pctv" style="color:#0B7A59">88%</span>
+        </div>
+        <div class="mrow">
+          <div class="name"><b>二叉树的遍历</b><span>树结构 · 建议类比迁移</span></div>
+          <div class="bar"><div class="progress"><i style="width:95%;background:linear-gradient(90deg,#12A87B,#3FB8E8)"></i></div></div>
+          <span class="pctv" style="color:#0B7A59">95%</span>
+        </div>
+        <div class="mrow">
+          <div class="name"><b>堆与优先队列</b><span>树结构 · 影响 Dijkstra 学习</span></div>
+          <div class="bar"><div class="progress"><i style="width:41%;background:linear-gradient(90deg,#E8930C,#E5484D)"></i></div></div>
+          <span class="pctv" style="color:#B45309">41%</span>
+        </div>
+        <div class="mrow">
+          <div class="name"><b>递归与回溯</b><span>基础算法 · 支撑 DFS</span></div>
+          <div class="bar"><div class="progress"><i style="width:78%;background:linear-gradient(90deg,#7C6CF0,#3FB8E8)"></i></div></div>
+          <span class="pctv" style="color:var(--primary-deep)">78%</span>
+        </div>
+      </section>
+
+      <section class="ai-card glass" aria-label="AI 学习建议">
+        <div class="ai-head">
+          <div class="face">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z"/><path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z"/></svg>
+          </div>
+          <div><b>知元 AI 助教</b><span>基于 128 个知识点画像生成</span></div>
+        </div>
+        <div class="ai-body">
+          <p class="ai-msg">你在 DFS 的<strong>递归终止条件</strong>上连续两次出错。建议先复习<strong>递归与回溯</strong>中的调用栈动画，再完成 3 道阶梯练习。掌握后，「堆与优先队列」将提前解锁，为 Dijkstra 做铺垫。</p>
+          <div class="ai-acts">
+            <a class="ai-act" href="#"><span class="n" style="background:linear-gradient(135deg,#7C6CF0,#3FB8E8)">1</span>复习「递归与回溯」微课 <small>12 分钟</small></a>
+            <a class="ai-act" href="#"><span class="n" style="background:linear-gradient(135deg,#F87BA6,#F5B26B)">2</span>完成 DFS 阶梯练习 ×3 <small>预计 20 分钟</small></a>
+            <a class="ai-act" href="#"><span class="n" style="background:linear-gradient(135deg,#12A87B,#3FB8E8)">3</span>挑战「岛屿数量」综合题 <small>选做</small></a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Resources -->
+    <div class="sec">
+      <h2><em></em>为你推荐 · 关联学习资源</h2>
+      <a href="#">全部资源</a>
+    </div>
+    <section class="res" aria-label="推荐资源">
+      <a class="rcard glass" href="#">
+        <div class="cover" style="background:linear-gradient(135deg,#7C6CF0,#3FB8E8)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m10 9 5 3-5 3z"/><rect x="3" y="5" width="18" height="14" rx="3"/></svg>
+          <span class="dur">12:40</span>
+        </div>
+        <div class="body">
+          <b>递归调用栈可视化</b>
+          <p>动画演示递归的入栈与回溯过程，直观理解 DFS 的执行流。</p>
+          <div class="foot"><span class="badge bg-learning"><i></i>与本路径相关</span><span>微课 · 3.2k 学习</span></div>
+        </div>
+      </a>
+      <a class="rcard glass" href="#">
+        <div class="cover" style="background:linear-gradient(135deg,#F87BA6,#F5B26B)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6.5A2.5 2.5 0 0 1 6.5 4H20"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4"/><path d="M9 8.5h7M9 12h7"/></svg>
+          <span class="dur">8 章</span>
+        </div>
+        <div class="body">
+          <b>《图论入门》交互讲义</b>
+          <p>AIGC 自动聚合教材、论文与讲义生成的结构化阅读材料。</p>
+          <div class="foot"><span class="badge bg-todo"><i></i>未开始</span><span>讲义 · AI 生成</span></div>
+        </div>
+      </a>
+      <a class="rcard glass" href="#">
+        <div class="cover" style="background:linear-gradient(135deg,#12A87B,#3FB8E8)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h9"/></svg>
+          <span class="dur">15 题</span>
+        </div>
+        <div class="body">
+          <b>DFS 专项智能题库</b>
+          <p>按难度阶梯自动组卷，错题自动关联图谱薄弱节点。</p>
+          <div class="foot"><span class="badge bg-mastered"><i></i>推荐指数 96</span><span>练习 · 自动批改</span></div>
+        </div>
+      </a>
+    </section>
+  </main>
+</div>
+</body>
+</html>

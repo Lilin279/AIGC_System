@@ -136,15 +136,38 @@ def _merge_extracted_graphs(base: ExtractedGraph, addition: ExtractedGraph) -> E
 
 
 def answer_with_evidence(question: str, evidence: list[dict]) -> str:
-    if not evidence:
-        return "课程资料中没有足够证据回答这个问题。"
     if not configured():
-        snippets = "；".join(item["excerpt"][:120] for item in evidence[:3] if item.get("excerpt"))
-        return f"根据课程资料，{snippets}" if snippets else "课程资料中没有足够证据回答这个问题。"
+        if not evidence:
+            return "课程资料中没有足够证据回答这个问题。"
+        snippets = [
+            (index, str(item.get("excerpt", ""))[:80])
+            for index, item in enumerate(evidence[:3], start=1)
+            if item.get("excerpt")
+        ]
+        if not snippets:
+            return "课程资料中没有足够证据回答这个问题。"
+        details = "\n".join(
+            f"{position}. {snippet}[{evidence_id}]"
+            for position, (evidence_id, snippet) in enumerate(snippets, start=1)
+        )
+        return f"结论：课程资料中找到了与问题相关的信息。\n{details}\n说明：当前使用本地规则整理，请结合下方证据核对具体关系。"
     payload = _chat_payload(
-        system="你是课程助教。只能依据编号证据回答；证据不足时明确说不知道。引用必须使用[1][2]格式，不得引用未提供的材料。",
-        user=f"问题：{question}\n\n证据：\n{_evidence_context(evidence)}",
-        max_tokens=1200,
+        system=(
+            "你是面向高校学生的课程助教。课程图谱和课件证据用于确定当前课程语境，但不是知识上限。"
+            "回答时先使用编号证据，再使用你自身掌握的稳定、通用学科知识补全证据没有展开的内容。"
+            "证据支持的说法必须引用[1][2]；通用知识放在‘补充知识’部分且不要伪造引用。"
+            "如果课程证据与通用知识冲突，以课程证据为准并说明差异；不确定的内容不要猜测。"
+            "使用日常、简洁的中文，避免长句、重复结论和‘根据现有证据可以说明’等机械套话。"
+            "准确区分图谱关系：包含关系不等于前置关系，相关关系不等于因果关系；证据未说明学习顺序时，必须明确说无法确定先后。"
+            "回答固定为以下纯文本结构，不要使用 Markdown 标题或表格：\n"
+            "结论：直接回答学生的问题。\n"
+            "课程图谱：用1至3条短句说明课程证据及图谱关系，并正确引用；没有直接证据时明确写‘未检索到直接证据’。\n"
+            "补充知识：直接补充回答问题所需的通用知识，例如常见类型、定义、用途和简短示例，不要添加证据编号。\n"
+            "说明：仅在内容存在版本差异、课程边界或容易误解时补充。\n"
+            "正文一般不超过420个汉字，优先保证答案具体、有用。"
+        ),
+        user=f"问题：{question}\n\n编号课程证据：\n{_evidence_context(evidence) or '（未检索到课程证据）'}",
+        max_tokens=900,
     )
     return _plain_text(_chat(payload, timeout_seconds=12.0, attempts=1, capability="graphrag_qa"))
 
@@ -172,48 +195,63 @@ def learning_analysis(
     return _plain_text(_chat(payload, timeout_seconds=12.0, attempts=1, capability="learning_analysis"))
 
 
-def exercises(course_name: str, nodes: list[KnowledgeNode], evidence: list[dict]) -> list[ExerciseResult]:
+def exercises(
+    course_name: str,
+    nodes: list[KnowledgeNode],
+    evidence: list[dict],
+    question_types: list[str] | None = None,
+    count: int = 3,
+) -> list[ExerciseResult]:
+    selected_types = question_types or ["基础题", "应用题", "易错题"]
+    count = max(1, min(10, count))
     if not configured():
-        return _offline_exercises(nodes, evidence)
+        return _offline_exercises(nodes, evidence, selected_types, count)
     node_names = "、".join(node.name for node in nodes[:5])
+    type_names = "、".join(selected_types)
     payload = _chat_payload(
         system="只输出合法 json，不要输出 Markdown。题目必须能由给定课程证据作答，不得引入课外事实。",
         user=(
-            f"请为《{course_name}》的薄弱知识点生成3道针对性练习，知识点：{node_names}。\n"
+            f"请为《{course_name}》的薄弱知识点生成恰好{count}道针对性练习，知识点：{node_names}。\n"
             f"证据：\n{_evidence_context(evidence)}\n"
-            "题型依次为基础题、应用题、易错题。输出 json："
+            f"题型只能从“{type_names}”中选择，并尽量均匀分配。输出 json："
             '{"exercises":[{"node_name":"","question_type":"基础题","difficulty":"基础",'
             '"question":"","answer":"","explanation":"","evidence_ids":[1]}]}'
         ),
-        max_tokens=1800,
+        max_tokens=min(6000, 800 + count * 450),
         json_output=True,
     )
     try:
         generated = GeneratedExerciseSet.model_validate(json.loads(
-            _chat(payload, timeout_seconds=12.0, attempts=1, capability="exercise_generation")
+            _chat(payload, timeout_seconds=20.0, attempts=1, capability="exercise_generation")
         ))
     except (json.JSONDecodeError, ValidationError) as exc:
         raise ValueError("DeepSeek 返回的练习结构不合法") from exc
     node_by_name = {node.name: node for node in nodes}
     fallback_node = nodes[0] if nodes else None
     results: list[ExerciseResult] = []
-    for item in generated.exercises[:3]:
+    for index, item in enumerate(generated.exercises[:count]):
         node = node_by_name.get(item.node_name) or fallback_node
         if not node or not item.question.strip() or not item.answer.strip():
             continue
         sources = [evidence[index - 1] for index in item.evidence_ids if 0 < index <= len(evidence)]
+        question_type = item.question_type if item.question_type in selected_types else selected_types[index % len(selected_types)]
         results.append(
             ExerciseResult(
                 node_id=node.id, node_name=node.name, question=item.question.strip(), answer=item.answer.strip(),
-                explanation=item.explanation.strip(), question_type=item.question_type,
+                explanation=item.explanation.strip(), question_type=question_type,
                 difficulty=item.difficulty, sources=sources, mode="deepseek-evidence",
             )
         )
-    return results or _offline_exercises(nodes, evidence)
+    if len(results) < count:
+        fallback = _offline_exercises(nodes, evidence, selected_types, count)
+        results.extend(fallback[len(results):count])
+    return results[:count]
 
 
-def offline_exercises(nodes: list[KnowledgeNode], evidence: list[dict]) -> list[ExerciseResult]:
-    return _offline_exercises(nodes, evidence)
+def offline_exercises(
+    nodes: list[KnowledgeNode], evidence: list[dict], question_types: list[str] | None = None, count: int = 3,
+) -> list[ExerciseResult]:
+    return _offline_exercises(nodes, evidence, question_types, count)
 
 
 def _request_extracted_graph(course_name: str, corpus: str, repair: bool, current: str = "") -> ExtractedGraph:
@@ -449,17 +487,36 @@ def _evidence_context(evidence: list[dict]) -> str:
     )
 
 
-def _offline_exercises(nodes: list[KnowledgeNode], evidence: list[dict]) -> list[ExerciseResult]:
-    types = [("基础题", "基础"), ("应用题", "中等"), ("易错题", "中等")]
+def _offline_exercises(
+    nodes: list[KnowledgeNode],
+    evidence: list[dict],
+    question_types: list[str] | None = None,
+    count: int = 3,
+) -> list[ExerciseResult]:
+    selected_types = question_types or ["基础题", "应用题", "易错题"]
+    difficulty_by_type = {"基础题": "基础", "应用题": "中等", "易错题": "中等"}
     results: list[ExerciseResult] = []
-    for index, node in enumerate(nodes[:3]):
-        question_type, difficulty = types[index]
+    if not nodes:
+        return results
+    for index in range(max(1, min(10, count))):
+        node = nodes[index % len(nodes)]
+        question_type = selected_types[index % len(selected_types)]
+        difficulty = difficulty_by_type.get(question_type, "中等")
+        if question_type == "应用题":
+            question = f"请结合课程场景，说明如何应用“{node.name}”解决一个具体问题。"
+            explanation = node.example or "回答应说明使用场景、操作步骤和预期结果。"
+        elif question_type == "易错题":
+            question = f"学习“{node.name}”时最容易出现什么错误？请说明原因和修正方法。"
+            explanation = node.example or "回答应指出常见误区，并给出正确做法。"
+        else:
+            question = f"请用自己的话解释“{node.name}”，并给出一个课程内示例。"
+            explanation = node.example or "回答应包含概念定义、适用条件和一个具体例子。"
         results.append(
             ExerciseResult(
                 node_id=node.id, node_name=node.name,
-                question=f"请用自己的话解释“{node.name}”，并给出一个课程内示例。",
+                question=question,
                 answer=node.definition or f"围绕 {node.name} 的核心定义作答。",
-                explanation=node.example or "回答应包含概念定义、适用条件和一个具体例子。",
+                explanation=explanation,
                 question_type=question_type, difficulty=difficulty, sources=evidence[:2], mode="offline-rule",
             )
         )

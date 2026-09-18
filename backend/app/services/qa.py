@@ -20,6 +20,6 @@ def answer_question(graph: KnowledgeGraph, question: str) -> QAResult:
     answer = (
         f"根据当前课程知识图谱，问题可以优先关联到 {names}。"
         f"建议先查看这些节点的定义、示例和前置关系，再结合教师上传资料进行复核。"
-        "当前为离线演示问答；配置大模型 API 后，可切换为 RAG 生成并返回更完整的引用片段。"
+        "当前使用本地规则问答；配置大模型 API 后，可切换为 RAG 生成并返回更完整的引用片段。"
     )
-    return QAResult(answer=answer, citations=citations, confidence="offline-rag-demo")
+    return QAResult(answer=answer, citations=citations, confidence="offline-rag")

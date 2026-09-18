@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知元智学 · 知识图谱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --aurora-violet:#7C6CF0;--aurora-cyan:#3FB8E8;--aurora-rose:#F87BA6;--aurora-amber:#F5B26B;
+  --primary:#6D5EF0;--primary-deep:#4A3ED6;--primary-soft:rgba(109,94,240,.12);
+  --ink:#23263B;--ink-soft:#5C617F;--ink-faint:#9BA0B8;--bg:#F2F4FB;
+  --success:#12A87B;--warning:#E8930C;--error:#E5484D;
+  --glass:rgba(255,255,255,.58);--glass-strong:rgba(255,255,255,.82);
+  --glass-border:rgba(255,255,255,.72);
+  --glass-shadow:0 8px 32px rgba(63,63,110,.10),0 1.5px 0 rgba(255,255,255,.9) inset;
+  --r-sm:10px;--r-md:16px;--r-lg:22px;--r-xl:30px;--r-full:999px;
+  --font-display:'Sora','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --ease-out:cubic-bezier(.22,1,.36,1);--t-fast:160ms var(--ease-out);--t-normal:320ms var(--ease-out);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-body);color:var(--ink);background:var(--bg);height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+.aurora{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.aurora i{position:absolute;border-radius:50%;filter:blur(100px);opacity:.45}
+.aurora i:nth-child(1){width:600px;height:600px;background:var(--aurora-violet);top:-220px;left:-160px;animation:d1 28s ease-in-out infinite alternate}
+.aurora i:nth-child(2){width:520px;height:520px;background:var(--aurora-cyan);bottom:-200px;right:-160px;animation:d2 32s ease-in-out infinite alternate}
+.aurora i:nth-child(3){width:480px;height:480px;background:var(--aurora-rose);bottom:-240px;left:34%;opacity:.3;animation:d3 36s ease-in-out infinite alternate}
+@keyframes d1{to{transform:translate(80px,60px) scale(1.1)}}
+@keyframes d2{to{transform:translate(-60px,-80px) scale(.94)}}
+@keyframes d3{to{transform:translate(70px,-60px) scale(1.06)}}
+
+/* Layout */
+.app{position:relative;z-index:1;display:grid;grid-template-columns:1fr 340px;height:100vh}
+.stage{display:flex;flex-direction:column;min-width:0}
+
+/* Topbar */
+.topbar{display:flex;align-items:center;gap:14px;padding:16px 24px}
+.back{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.back .mark{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-cyan));display:grid;place-items:center;color:#fff;box-shadow:0 8px 18px rgba(109,94,240,.35)}
+.back b{font-family:var(--font-display);font-size:16px;font-weight:800;display:block;line-height:1.25}
+.back small{font-size:11px;color:var(--ink-faint)}
+.topbar .crumb{margin-left:8px;font-size:13px;color:var(--ink-faint)}
+.topbar .crumb b{color:var(--ink);font-weight:600}
+.spacer{flex:1}
+.zoom-ctrl{display:flex;gap:6px}
+.zbtn{width:36px;height:36px;border-radius:11px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px);cursor:pointer;color:var(--ink-soft);display:grid;place-items:center;font-size:16px;font-family:var(--font-display);transition:all var(--t-fast)}
+.zbtn:hover{background:var(--glass-strong);transform:translateY(-1px)}
+
+/* Filters */
+.filters{display:flex;gap:8px;flex-wrap:wrap;padding:0 24px 14px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:500;color:var(--ink-soft);padding:7px 16px;border-radius:var(--r-full);border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px);cursor:pointer;transition:all var(--t-fast)}
+.chip i{width:7px;height:7px;border-radius:50%;font-style:normal}
+.chip:hover{background:var(--glass-strong)}
+.chip.on{color:var(--primary-deep);font-weight:700;background:linear-gradient(120deg,rgba(109,94,240,.16),rgba(63,184,232,.14));border-color:rgba(109,94,240,.35)}
+.chip.on i{box-shadow:0 0 0 3px rgba(109,94,240,.15)}
+
+/* Graph canvas */
+.canvas-wrap{flex:1;position:relative;margin:0 24px 24px;border-radius:var(--r-xl);overflow:hidden;background:rgba(255,255,255,.4);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);cursor:grab}
+.canvas-wrap:active{cursor:grabbing}
+#viewport{width:100%;height:100%;transform-origin:center;transition:transform .45s var(--ease-out)}
+#graph{width:100%;height:100%;display:block}
+
+/* SVG node styles */
+.hull{opacity:.55}
+.hull-label{font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:.14em;fill:var(--ink-faint)}
+.edge{stroke:rgba(92,97,127,.30);stroke-width:1.6;fill:none;stroke-dasharray:460;stroke-dashoffset:460;animation:draw 1.6s var(--ease-out) forwards}
+.edge.hot{stroke:url(#gradEdge);stroke-width:2.4;stroke:rgba(109,94,240,.55)}
+@keyframes draw{to{stroke-dashoffset:0}}
+.gnode{cursor:pointer}
+.gnode circle.body{transition:transform var(--t-normal);transform-box:fill-box;transform-origin:center}
+.gnode:hover circle.body{transform:scale(1.14)}
+.gnode text{font-family:var(--font-body);font-size:11.5px;font-weight:600;fill:var(--ink);text-anchor:middle;pointer-events:none}
+.gnode.dim{opacity:.16;pointer-events:none}
+.gnode circle.pulse{animation:pulse 2.4s var(--ease-out) infinite}
+@keyframes pulse{0%{transform:scale(.85);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+.gnode circle.body{transform-box:fill-box;transform-origin:center}
+.gnode circle.pulse{transform-box:fill-box;transform-origin:center}
+
+/* Legend */
+.legend{position:absolute;left:18px;bottom:16px;display:flex;gap:14px;padding:10px 18px;border-radius:var(--r-full);background:var(--glass-strong);backdrop-filter:blur(18px);border:1px solid var(--glass-border);font-size:12px;color:var(--ink-soft)}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;font-style:normal}
+
+/* Tooltip */
+.tip{position:absolute;pointer-events:none;padding:10px 14px;border-radius:12px;background:rgba(30,30,55,.88);backdrop-filter:blur(10px);color:#fff;font-size:12px;line-height:1.6;opacity:0;transform:translate(-50%,calc(-100% - 14px)) scale(.94);transition:opacity var(--t-fast),transform var(--t-fast);z-index:5;white-space:nowrap}
+.tip.show{opacity:1;transform:translate(-50%,calc(-100% - 14px)) scale(1)}
+.tip b{display:block;font-size:13px}
+.tip .st{color:var(--aurora-amber)}
+
+/* ===== Right panel ===== */
+.panel{display:flex;flex-direction:column;height:100vh;margin:16px 16px 16px 0;border-radius:var(--r-xl);background:var(--glass);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);overflow-y:auto}
+.panel-head{padding:22px 24px 0}
+.panel-head .tag{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:99px;margin-bottom:10px}
+.panel-head h1{font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-.01em;line-height:1.35}
+.panel-head .sub{font-size:12.5px;color:var(--ink-soft);margin-top:4px}
+
+/* mastery ring */
+.mastery{display:flex;align-items:center;gap:18px;padding:18px 24px}
+.mastery .ring{position:relative;width:86px;height:86px;flex-shrink:0}
+.mastery .ring svg{transform:rotate(-90deg)}
+.mastery .ring .v{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-display);font-weight:800;font-size:19px}
+.mastery .desc{font-size:12.5px;color:var(--ink-soft);line-height:1.8}
+.mastery .desc b{color:var(--ink)}
+
+.psec{padding:0 24px 6px}
+.psec h3{font-size:12px;color:var(--ink-faint);letter-spacing:.12em;font-weight:600;margin-bottom:10px}
+.dep-chips{display:flex;flex-wrap:wrap;gap:8px}
+.dep{font-size:12px;padding:6px 13px;border-radius:99px;background:rgba(255,255,255,.72);border:1px solid var(--glass-border);color:var(--ink-soft);cursor:pointer;transition:all var(--t-fast);display:inline-flex;gap:6px;align-items:center}
+.dep:hover{color:var(--primary-deep);border-color:rgba(109,94,240,.4);transform:translateY(-1px)}
+.dep i{width:6px;height:6px;border-radius:50%;font-style:normal}
+
+.res-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;text-decoration:none;color:var(--ink);transition:background var(--t-fast)}
+.res-item:hover{background:rgba(255,255,255,.75)}
+.res-item .ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:#fff;flex-shrink:0;font-size:12px;font-weight:700;font-family:var(--font-display)}
+.res-item b{font-size:13px;display:block;line-height:1.4}
+.res-item small{font-size:11px;color:var(--ink-faint)}
+.res-item .go{margin-left:auto;color:var(--ink-faint);flex-shrink:0}
+
+.panel .actions{margin-top:auto;padding:18px 24px 22px;display:flex;gap:10px}
+.btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-body);font-weight:600;font-size:13.5px;padding:13px 18px;border-radius:var(--r-full);border:none;cursor:pointer;transition:all var(--t-fast);text-decoration:none}
+.btn-primary{color:#fff;background:linear-gradient(120deg,var(--aurora-violet),var(--aurora-cyan));box-shadow:0 10px 24px rgba(109,94,240,.35)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(109,94,240,.42)}
+.btn-ghost{color:var(--primary-deep);background:var(--primary-soft)}
+.btn-ghost:hover{background:rgba(109,94,240,.2)}
+
+/* AI insight strip */
+.ai-strip{margin:6px 24px 16px;padding:13px 16px;border-radius:14px;background:linear-gradient(120deg,rgba(124,108,240,.14),rgba(63,184,232,.12));border:1px solid rgba(109,94,240,.22);font-size:12.5px;color:var(--ink-soft);line-height:1.75;display:flex;gap:10px}
+.ai-strip .ico{flex-shrink:0;width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-rose));display:grid;place-items:center;color:#fff}
+.ai-strip b{color:var(--ink)}
+
+@media(max-width:980px){
+  body{overflow:auto}
+  .app{grid-template-columns:1fr;height:auto}
+  .canvas-wrap{height:64vh}
+  .panel{height:auto;margin:0 16px 24px}
+}
+</style>
+</head>
+<body>
+<div class="aurora"><i></i><i></i><i></i></div>
+
+<div class="app">
+  <!-- ===== Stage ===== -->
+  <div class="stage">
+    <div class="topbar">
+      <a class="back" href="dashboard.html">
+        <span class="mark"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2.4" fill="currentColor"/><circle cx="5" cy="17" r="2.4" fill="currentColor"/><circle cx="19" cy="17" r="2.4" fill="currentColor"/><path d="M12 7.4 6.4 15M12 7.4 17.6 15M7.4 17h9.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".75"/></svg></span>
+        <span><b>知元智学</b><small>KNOWVERSE</small></span>
+      </a>
+      <span class="crumb">我的课程 / <b>数据结构</b> / 知识图谱</span>
+      <span class="spacer"></span>
+      <div class="zoom-ctrl">
+        <button class="zbtn" id="zoom-out" aria-label="缩小">−</button>
+        <button class="zbtn" id="zoom-in" aria-label="放大">+</button>
+        <button class="zbtn" id="zoom-reset" aria-label="重置视角" style="width:auto;padding:0 12px;font-size:12px">重置</button>
+      </div>
+    </div>
+
+    <div class="filters" role="group" aria-label="节点状态筛选">
+      <button class="chip on" data-filter="all"><i style="background:linear-gradient(135deg,#7C6CF0,#3FB8E8)"></i>全部 · 17</button>
+      <button class="chip" data-filter="mastered"><i style="background:var(--success)"></i>已掌握 · 8</button>
+      <button class="chip" data-filter="learning"><i style="background:var(--primary)"></i>学习中 · 2</button>
+      <button class="chip" data-filter="weak"><i style="background:var(--warning)"></i>待巩固 · 1</button>
+      <button class="chip" data-filter="todo"><i style="background:var(--ink-faint)"></i>未开始 · 6</button>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <div id="viewport">
+        <svg id="graph" viewBox="0 0 1000 660" role="img" aria-label="数据结构课程知识图谱，包含基础概念、树结构、图论、算法设计四个章节聚类">
+          <defs>
+            <linearGradient id="gradV" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C6CF0"/><stop offset="1" stop-color="#3FB8E8"/></linearGradient>
+            <linearGradient id="gradG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#12A87B"/><stop offset="1" stop-color="#3FB8E8"/></linearGradient>
+            <linearGradient id="gradR" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F87BA6"/><stop offset="1" stop-color="#F5B26B"/></linearGradient>
+            <radialGradient id="hullB" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#7C6CF0" stop-opacity=".13"/><stop offset="1" stop-color="#7C6CF0" stop-opacity="0"/></radialGradient>
+            <radialGradient id="hullT" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#3FB8E8" stop-opacity=".13"/><stop offset="1" stop-color="#3FB8E8" stop-opacity="0"/></radialGradient>
+            <radialGradient id="hulG" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F87BA6" stop-opacity=".12"/><stop offset="1" stop-color="#F87BA6" stop-opacity="0"/></radialGradient>
+            <radialGradient id="hulA" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#F5B26B" stop-opacity=".13"/><stop offset="1" stop-color="#F5B26B" stop-opacity="0"/></radialGradient>
+          </defs>
+
+          <!-- chapter hulls -->
+          <ellipse class="hull" fill="url(#hullB)" cx="205" cy="150" rx="190" ry="130"/>
+          <ellipse class="hull" fill="url(#hulT)" cx="770" cy="145" rx="185" ry="125"/>
+          <ellipse class="hull" fill="url(#hulG)" cx="380" cy="480" rx="250" ry="150"/>
+          <ellipse class="hull" fill="url(#hulA)" cx="850" cy="470" rx="170" ry="150"/>
+          <text class="hull-label" x="60" y="52">CH.01 基础概念</text>
+          <text class="hull-label" x="640" y="48">CH.02 树结构</text>
+          <text class="hull-label" x="180" y="352">CH.03 图论</text>
+          <text class="hull-label" x="748" y="330">CH.04 算法设计</text>
+
+          <!-- edges (drawn before nodes) -->
+          <g id="edges">
+            <path class="edge" d="M140 108 Q190 80 258 82"/>
+            <path class="edge" d="M118 112 Q110 170 116 200"/>
+            <path class="edge" d="M262 110 Q288 150 296 188"/>
+            <path class="edge" d="M258 218 Q420 300 520 380" />
+            <path class="edge" d="M320 236 Q420 350 470 430"/>
+            <path class="edge" d="M700 112 Q690 150 690 186"/>
+            <path class="edge" d="M646 106 Q760 70 866 84"/>
+            <path class="edge" d="M702 100 Q830 130 906 194"/>
+            <path class="edge" d="M686 214 Q560 320 480 396"/>
+            <path class="edge" d="M170 428 Q240 400 306 384"/>
+            <path class="edge" d="M356 372 Q380 350 408 372" />
+            <path class="edge" d="M320 396 Q318 440 322 478"/>
+            <path class="edge" d="M366 388 Q440 460 480 502"/>
+            <path class="edge" d="M352 520 Q420 528 448 524"/>
+            <path class="edge" d="M494 508 Q500 546 500 566"/>
+            <path class="edge" d="M524 486 Q600 470 634 470"/>
+            <path class="edge" d="M892 244 Q820 320 786 342"/>
+            <path class="edge" d="M662 446 Q740 470 800 486"/>
+            <path class="edge" d="M680 478 Q760 540 806 546"/>
+            <path class="edge" d="M780 384 Q820 440 836 522"/>
+            <path class="edge" d="M898 470 Q880 500 866 524"/>
+          </g>
+
+          <!-- nodes injected by JS -->
+          <g id="nodes"></g>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i style="background:linear-gradient(135deg,#12A87B,#3FB8E8)"></i>已掌握</span>
+        <span><i style="background:linear-gradient(135deg,#7C6CF0,#3FB8E8)"></i>学习中</span>
+        <span><i style="background:linear-gradient(135deg,#E8930C,#E5484D)"></i>待巩固</span>
+        <span><i style="background:#fff;border:1.5px dashed var(--ink-faint)"></i>未开始</span>
+        <span style="color:var(--ink-faint)">节点大小 = 图谱重要度</span>
+      </div>
+      <div class="tip" id="tip"></div>
+    </div>
+  </div>
+
+  <!-- ===== Detail panel ===== -->
+  <aside class="panel" id="panel" aria-label="知识点详情">
+    <div class="panel-head">
+      <span class="tag" id="d-tag" style="background:var(--primary-soft);color:var(--primary-deep)"><i style="width:6px;height:6px;border-radius:50%;background:var(--primary);font-style:normal"></i><span id="d-state">学习中</span></span>
+      <h1 id="d-title">深度优先搜索</h1>
+      <p class="sub" id="d-sub">图论 · CH.03 · 重要度 ★★★★★ · 3 个前置依赖</p>
+    </div>
+
+    <div class="mastery">
+      <div class="ring">
+        <svg width="86" height="86" viewBox="0 0 86 86">
+          <circle cx="43" cy="43" r="36" fill="none" stroke="rgba(92,97,127,.15)" stroke-width="8"/>
+          <circle id="d-ring" cx="43" cy="43" r="36" fill="none" stroke="url(#panelGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="226.2" stroke-dashoffset="86">
+            <animate attributeName="stroke-dashoffset" from="226.2" to="86" dur="1s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1"/>
+          </circle>
+          <defs><linearGradient id="panelGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C6CF0"/><stop offset="1" stop-color="#3FB8E8"/></linearGradient></defs>
+        </svg>
+        <span class="v" id="d-pct">62%</span>
+      </div>
+      <p class="desc">掌握度评估综合了<b>测验正确率</b>、<b>练习完成度</b>与<b>关联知识点迁移表现</b>，每周由 AI 助教重新计算。</p>
+    </div>
+
+    <div class="ai-strip">
+      <span class="ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z"/></svg></span>
+      <span>AI 提示：你的<b>递归终止条件</b>判断正确率仅 55%，是当前掌握度的主要瓶颈。建议先完成左侧「递归与回溯」的复习。</span>
+    </div>
+
+    <div class="psec">
+      <h3>前置知识点</h3>
+      <div class="dep-chips" id="d-deps">
+        <span class="dep"><i style="background:var(--primary)"></i>递归与回溯 · 78%</span>
+        <span class="dep"><i style="background:var(--success)"></i>图的存储结构</span>
+        <span class="dep"><i style="background:var(--success)"></i>树的遍历</span>
+      </div>
+    </div>
+
+    <div class="psec" style="margin-top:18px">
+      <h3>关联资源</h3>
+      <a class="res-item" href="#">
+        <span class="ico" style="background:linear-gradient(135deg,#7C6CF0,#3FB8E8)">课</span>
+        <span><b>DFS 精讲微课</b><small>12 分 40 秒 · 已学至 06:12</small></span>
+        <span class="go">→</span>
+      </a>
+      <a class="res-item" href="#">
+        <span class="ico" style="background:linear-gradient(135deg,#F87BA6,#F5B26B)">题</span>
+        <span><b>DFS 阶梯练习 ×3</b><small>AI 按薄弱点自动组卷</small></span>
+        <span class="go">→</span>
+      </a>
+      <a class="res-item" href="#">
+        <span class="ico" style="background:linear-gradient(135deg,#12A87B,#3FB8E8)">图</span>
+        <span><b>调用栈可视化动画</b><small>交互演示 · 推荐先看</small></span>
+        <span class="go">→</span>
+      </a>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-primary" href="#">继续学习</a>
+      <a class="btn btn-ghost" href="#">加入计划</a>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* ============ Graph data ============ */
+const NODES=[
+  // CH.01 基础概念
+  {id:'arr',   x:118, y:96,  r:26, label:'数组与链表', st:'mastered', ch:'基础概念', imp:4},
+  {id:'stack', x:266, y:82,  r:24, label:'栈',          st:'mastered', ch:'基础概念', imp:3},
+  {id:'queue', x:112, y:224, r:24, label:'队列',        st:'mastered', ch:'基础概念', imp:3},
+  {id:'rec',   x:312, y:212, r:30, label:'递归与回溯',  st:'learning', ch:'基础概念', imp:5},
+  // CH.02 树结构
+  {id:'bt',    x:690, y:84,  r:32, label:'二叉树',      st:'mastered', ch:'树结构', imp:5},
+  {id:'bst',   x:882, y:78,  r:26, label:'二叉搜索树',  st:'mastered', ch:'树结构', imp:4},
+  {id:'trav',  x:686, y:202, r:26, label:'树的遍历',    st:'mastered', ch:'树结构', imp:4},
+  {id:'heap',  x:918, y:214, r:26, label:'堆与优先队列',st:'weak',     ch:'树结构', imp:4},
+  // CH.03 图论
+  {id:'gcon',  x:160, y:424, r:26, label:'图的基本概念',st:'mastered', ch:'图论', imp:4},
+  {id:'gsto',  x:326, y:382, r:28, label:'图的存储结构',st:'mastered', ch:'图论', imp:4},
+  {id:'dfs',   x:322, y:502, r:34, label:'深度优先搜索',st:'learning', ch:'图论', imp:5},
+  {id:'bfs',   x:474, y:522, r:30, label:'广度优先搜索',st:'todo',     ch:'图论', imp:5},
+  {id:'topo',  x:502, y:588, r:24, label:'拓扑排序',    st:'todo',     ch:'图论', imp:3},
+  {id:'sp',    x:644, y:462, r:30, label:'最短路径',    st:'todo',     ch:'图论', imp:5},
+  // CH.04 算法设计
+  {id:'dc',    x:778, y:352, r:24, label:'分治',        st:'todo',     ch:'算法设计', imp:3},
+  {id:'greedy',x:816, y:492, r:24, label:'贪心',        st:'todo',     ch:'算法设计', imp:3},
+  {id:'dp',    x:844, y:548, r:30, label:'动态规划',    st:'todo',     ch:'算法设计', imp:5},
+];
+
+const STYLES={
+  mastered:{fill:'url(#gradG)',text:'#fff',name:'已掌握'},
+  learning:{fill:'url(#gradV)',text:'#fff',name:'学习中'},
+  weak:{fill:'url(#gradR)',text:'#fff',name:'待巩固'},
+  todo:{fill:'rgba(255,255,255,.92)',text:'#5C617F',name:'未开始',dashed:true},
+};
+
+const svg=document.getElementById('nodes');
+const tip=document.getElementById('tip');
+const wrap=document.getElementById('canvasWrap');
+
+/* Build nodes */
+NODES.forEach((n,idx)=>{
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('class','gnode');
+  g.dataset.id=n.id; g.dataset.st=n.st;
+  g.setAttribute('tabindex','0');
+  g.setAttribute('role','button');
+  g.setAttribute('aria-label',n.label+'，'+STYLES[n.st].name);
+
+  if(n.st==='learning'){
+    const p=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    p.setAttribute('class','pulse');
+    p.setAttribute('cx',n.x);p.setAttribute('cy',n.y);p.setAttribute('r',n.r);
+    p.setAttribute('fill','none');p.setAttribute('stroke','#7C6CF0');p.setAttribute('stroke-width','2');
+    g.appendChild(p);
+  }
+  const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('class','body');
+  c.setAttribute('cx',n.x);c.setAttribute('cy',n.y);c.setAttribute('r',n.r);
+  c.setAttribute('fill',STYLES[n.st].fill);
+  if(STYLES[n.st].dashed){c.setAttribute('stroke','#9BA0B8');c.setAttribute('stroke-width','1.6');c.setAttribute('stroke-dasharray','4 3');}
+  else{c.setAttribute('stroke','rgba(255,255,255,.7)');c.setAttribute('stroke-width','2');}
+  g.appendChild(c);
+
+  const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x',n.x);t.setAttribute('y',n.y+4);
+  t.textContent=n.label.length>5?n.label.slice(0,4)+'…':n.label;
+  t.setAttribute('fill',STYLES[n.st].dashed?'#5C617F':'#fff');
+  g.appendChild(t);
+
+  const t2=document.createElementNS('http://www.w3.org/2000/svg','text');
+  t2.setAttribute('x',n.x);t2.setAttribute('y',n.y+n.r+18);
+  t2.textContent=n.label;
+  t2.setAttribute('fill','#5C617F');t2.setAttribute('font-size','11');t2.setAttribute('font-weight','500');
+  t2.style.display='none';t2.classList.add('full-label');
+  g.appendChild(t2);
+
+  g.addEventListener('click',()=>select(n));
+  g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(n);}});
+  g.addEventListener('mouseenter',e=>showTip(e,n));
+  g.addEventListener('mousemove',e=>showTip(e,n));
+  g.addEventListener('mouseleave',()=>tip.classList.remove('show'));
+  svg.appendChild(g);
+});
+
+/* Tooltip */
+function showTip(e,n){
+  const rect=wrap.getBoundingClientRect();
+  tip.innerHTML=`<b>${n.label}</b>CH.${n.ch} · 掌握 ${masteryOf(n)}% · <span class="st">${STYLES[n.st].name}</span>`;
+  tip.style.left=(e.clientX-rect.left)+'px';
+  tip.style.top=(e.clientY-rect.top)+'px';
+  tip.classList.add('show');
+}
+const MASTERY={arr:95,stack:98,queue:88,rec:78,bt:92,bst:96,trav:95,heap:41,gcon:90,gsto:93,dfs:62,bfs:0,topo:0,sp:0,dc:0,greedy:0,dp:0};
+function masteryOf(n){return MASTERY[n.id]??0}
+
+/* Detail panel */
+const $=id=>document.getElementById(id);
+function select(n){
+  const s=STYLES[n.st];
+  $('d-title').textContent=n.label;
+  $('d-sub').textContent=`${n.ch} · 重要度 ${'★'.repeat(n.imp)} · ${n.imp>=5?'核心知识点':'常规知识点'}`;
+  $('d-state').textContent=s.name;
+  const tag=$('d-tag');
+  tag.style.background = n.st==='mastered'?'rgba(18,168,123,.13)':n.st==='weak'?'rgba(232,147,12,.14)':n.st==='todo'?'rgba(92,97,127,.12)':'var(--primary-soft)';
+  tag.style.color = n.st==='mastered'?'#0B7A59':n.st==='weak'?'#9A6207':n.st==='todo'?'var(--ink-soft)':'var(--primary-deep)';
+  tag.querySelector('i').style.background = n.st==='mastered'?'var(--success)':n.st==='weak'?'var(--warning)':n.st==='todo'?'var(--ink-faint)':'var(--primary)';
+
+  const pct=masteryOf(n);
+  $('d-pct').textContent=pct+'%';
+  const ring=$('d-ring');
+  const C=226.2;
+  ring.setAttribute('stroke-dashoffset',C*(1-pct/100));
+  ring.setAttribute('stroke',n.st==='mastered'?'url(#panelGrad)':n.st==='weak'?'#E8930C':'url(#panelGrad)');
+
+  /* highlight related edges */
+  document.querySelectorAll('.edge').forEach(el=>el.classList.remove('hot'));
+}
+
+/* Filters */
+document.querySelectorAll('.chip').forEach(ch=>{
+  ch.addEventListener('click',()=>{
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+    ch.classList.add('on');
+    const f=ch.dataset.filter;
+    document.querySelectorAll('.gnode').forEach(g=>{
+      g.classList.toggle('dim',f!=='all'&&g.dataset.st!==f);
+    });
+    document.querySelectorAll('.edge').forEach(e=>e.style.opacity=f==='all'?'1':'.35');
+  });
+});
+
+/* Zoom */
+let scale=1;
+const vp=document.getElementById('viewport');
+function applyZoom(){vp.style.transform=`scale(${scale})`}
+document.getElementById('zoom-in').onclick=()=>{scale=Math.min(2,scale+.15);applyZoom()};
+document.getElementById('zoom-out').onclick=()=>{scale=Math.max(.6,scale-.15);applyZoom()};
+document.getElementById('zoom-reset').onclick=()=>{scale=1;applyZoom()};
+wrap.addEventListener('wheel',e=>{
+  if(!e.ctrlKey)return;
+  e.preventDefault();
+  scale=Math.min(2,Math.max(.6,scale+(e.deltaY<0?.08:-.08)));
+  applyZoom();
+},{passive:false});
+
+/* Drag pan */
+let dragging=false,sx=0,sy=0,tx=0,ty=0;
+wrap.addEventListener('pointerdown',e=>{dragging=true;sx=e.clientX-tx;sy=e.clientY-ty});
+window.addEventListener('pointermove',e=>{if(!dragging)return;tx=e.clientX-sx;ty=e.clientY-sy;vp.style.transform=`scale(${scale}) translate(${tx/scale}px,${ty/scale}px)`});
+window.addEventListener('pointerup',()=>dragging=false);
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import type {
   AIStatus, AuthResult, Classroom, Course, DashboardStats, DiagnosisResult, DocumentImpact, DocumentInfo,
-  ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
+  ExerciseGenerateRequest, ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
   KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, Ticket, User,
 } from './types';
 
@@ -94,7 +94,7 @@ export const api = {
   classQa: (classroomId: string, question: string) => request<QAResult>(`/api/classrooms/${classroomId}/qa`, json('POST', { question })),
   classPath: (classroomId: string) => request<LearningPathResult>(`/api/classrooms/${classroomId}/learning-path`, json('POST', {})),
   diagnosis: (classroomId: string) => request<DiagnosisResult>(`/api/classrooms/${classroomId}/diagnosis`),
-  exercises: (classroomId: string) => request<ExerciseResult[]>(`/api/classrooms/${classroomId}/exercises`, { method: 'POST' }),
+  exercises: (classroomId: string, payload?: ExerciseGenerateRequest) => request<ExerciseResult[]>(`/api/classrooms/${classroomId}/exercises`, payload ? json('POST', payload) : { method: 'POST' }),
   previewImport: (classroomId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);

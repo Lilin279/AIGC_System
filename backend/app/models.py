@@ -28,7 +28,7 @@ class User(BaseModel):
     id: str
     name: str
     role: Literal["admin", "teacher", "student"]
-    organization: str = "演示学校"
+    organization: str = ""
     username: str = ""
     email: str = ""
     phone: str = ""
@@ -50,7 +50,7 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
     name: str
-    organization: str = "金扬智能示范学校"
+    organization: str = ""
 
 
 class TeacherRegisterRequest(RegisterRequest):
@@ -225,6 +225,16 @@ class QAResult(BaseModel):
     confidence: str = "demo"
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     mode: str = "offline"
+
+
+ExerciseQuestionType = Literal["基础题", "应用题", "易错题"]
+
+
+class ExerciseGenerateRequest(BaseModel):
+    question_types: list[ExerciseQuestionType] = Field(
+        default_factory=lambda: ["基础题", "应用题", "易错题"], min_length=1, max_length=3,
+    )
+    count: int = Field(default=3, ge=1, le=10)
 
 
 class AIStatus(BaseModel):

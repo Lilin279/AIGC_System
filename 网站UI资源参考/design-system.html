@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知元智学 · 设计规范 Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============ Design Tokens ============ */
+:root{
+  /* Color · Aurora Glass */
+  --aurora-violet:#7C6CF0;
+  --aurora-cyan:#3FB8E8;
+  --aurora-rose:#F87BA6;
+  --aurora-amber:#F5B26B;
+
+  --primary:#6D5EF0;
+  --primary-deep:#4A3ED6;
+  --primary-soft:rgba(109,94,240,.12);
+
+  --ink:#23263B;
+  --ink-soft:#5C617F;
+  --ink-faint:#9BA0B8;
+  --bg:#F2F4FB;
+
+  --success:#12A87B;
+  --warning:#E8930C;
+  --error:#E5484D;
+  --info:#3B82F6;
+
+  /* Glass surfaces */
+  --glass:rgba(255,255,255,.58);
+  --glass-strong:rgba(255,255,255,.74);
+  --glass-border:rgba(255,255,255,.72);
+  --glass-shadow:0 8px 32px rgba(63,63,110,.10),0 1.5px 0 rgba(255,255,255,.9) inset;
+
+  /* Radius */
+  --r-sm:10px; --r-md:16px; --r-lg:22px; --r-xl:30px; --r-full:999px;
+
+  /* Spacing 4pt */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--s9:96px;
+
+  /* Type */
+  --font-display:'Sora','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  --font-body:'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+
+  /* Motion */
+  --ease-out:cubic-bezier(.22,1,.36,1);
+  --t-fast:160ms var(--ease-out);
+  --t-normal:320ms var(--ease-out);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font-body);
+  color:var(--ink);
+  background:var(--bg);
+  min-height:100vh;
+  line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ============ Aurora Backdrop ============ */
+.aurora{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.aurora i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5}
+.aurora i:nth-child(1){width:620px;height:620px;background:var(--aurora-violet);top:-220px;left:-140px;animation:drift1 26s ease-in-out infinite alternate}
+.aurora i:nth-child(2){width:520px;height:520px;background:var(--aurora-cyan);top:-120px;right:-160px;animation:drift2 30s ease-in-out infinite alternate}
+.aurora i:nth-child(3){width:560px;height:560px;background:var(--aurora-rose);bottom:-260px;left:28%;animation:drift3 34s ease-in-out infinite alternate;opacity:.36}
+.aurora i:nth-child(4){width:420px;height:420px;background:var(--aurora-amber);bottom:-160px;right:6%;animation:drift1 28s ease-in-out infinite alternate-reverse;opacity:.32}
+@keyframes drift1{to{transform:translate(80px,60px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(-70px,90px) scale(.94)}}
+@keyframes drift3{to{transform:translate(60px,-70px) scale(1.08)}}
+
+/* ============ Layout ============ */
+.wrap{max-width:1120px;margin:0 auto;padding:var(--s8) var(--s5) var(--s9)}
+
+/* ============ Glass primitives ============ */
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(24px) saturate(1.5);
+  -webkit-backdrop-filter:blur(24px) saturate(1.5);
+  border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow);
+  border-radius:var(--r-lg);
+}
+
+/* ============ Header ============ */
+header.masthead{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s5);margin-bottom:var(--s7);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:var(--s3)}
+.brand-mark{
+  width:52px;height:52px;border-radius:16px;
+  background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-cyan));
+  display:grid;place-items:center;color:#fff;
+  box-shadow:0 10px 24px rgba(109,94,240,.35);
+}
+.brand h1{font-family:var(--font-display);font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.brand p{font-size:13px;color:var(--ink-soft);letter-spacing:.14em}
+.masthead .meta{font-size:13px;color:var(--ink-soft);text-align:right}
+.masthead .meta strong{display:block;font-family:var(--font-display);color:var(--ink);font-size:15px}
+
+/* ============ Section ============ */
+section{margin-bottom:var(--s8)}
+.sec-head{display:flex;align-items:baseline;gap:var(--s3);margin-bottom:var(--s5)}
+.sec-num{font-family:var(--font-display);font-weight:800;font-size:13px;color:var(--primary);letter-spacing:.1em}
+.sec-head h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.01em}
+.sec-head span{font-size:13px;color:var(--ink-faint)}
+
+.grid{display:grid;gap:var(--s4)}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:900px){.g-3,.g-4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.g-2,.g-3,.g-4{grid-template-columns:1fr}}
+
+.panel{padding:var(--s5)}
+.panel h3{font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:var(--s4);display:flex;align-items:center;gap:var(--s2)}
+.panel h3::before{content:"";width:8px;height:8px;border-radius:3px;background:linear-gradient(135deg,var(--aurora-violet),var(--aurora-cyan))}
+
+/* ============ Color swatches ============ */
+.swatch{border-radius:var(--r-md);overflow:hidden;background:#fff;border:1px solid rgba(255,255,255,.8);box-shadow:var(--glass-shadow)}
+.swatch .chip{height:76px}
+.swatch .info{padding:10px 14px}
+.swatch .info b{display:block;font-size:13px;font-weight:700}
+.swatch .info code{font-size:11px;color:var(--ink-faint);font-family:ui-monospace,monospace}
+
+/* ============ Type specimen ============ */
+.type-row{display:flex;align-items:baseline;gap:var(--s4);padding:var(--s3) 0;border-bottom:1px dashed rgba(92,97,127,.18);flex-wrap:wrap}
+.type-row:last-child{border-bottom:0}
+.type-label{width:190px;font-size:11px;color:var(--ink-faint);font-family:ui-monospace,monospace;flex-shrink:0}
+.t-display{font-family:var(--font-display);font-weight:800;font-size:clamp(34px,5vw,52px);letter-spacing:-.03em;line-height:1.15;background:linear-gradient(100deg,var(--primary),var(--aurora-cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.t-h1{font-family:var(--font-display);font-weight:700;font-size:clamp(26px,3.4vw,34px);letter-spacing:-.02em}
+.t-h2{font-family:var(--font-display);font-weight:700;font-size:22px}
+.t-body{font-size:16px;color:var(--ink-soft);max-width:46ch}
+.t-caption{font-size:13px;color:var(--ink-faint)}
+
+/* ============ Buttons ============ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);
+  font-family:var(--font-body);font-weight:500;font-size:14px;
+  border:none;cursor:pointer;user-select:none;text-decoration:none;
+  padding:11px 22px;border-radius:var(--r-full);
+  transition:transform var(--t-fast),box-shadow var(--t-fast),background var(--t-fast);
+}
+.btn:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.btn-primary{
+  color:#fff;
+  background:linear-gradient(120deg,var(--primary),var(--aurora-cyan));
+  box-shadow:0 8px 20px rgba(109,94,240,.34);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(109,94,240,.42)}
+.btn-glass{color:var(--ink);background:var(--glass);backdrop-filter:blur(18px);border:1px solid var(--glass-border)}
+.btn-glass:hover{transform:translateY(-2px);background:var(--glass-strong)}
+.btn-ghost{color:var(--primary);background:var(--primary-soft)}
+.btn-ghost:hover{background:rgba(109,94,240,.2)}
+.btn-danger{color:#fff;background:var(--error)}
+.btn-row{display:flex;gap:var(--s3);flex-wrap:wrap;align-items:center}
+
+/* ============ Inputs ============ */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:var(--s4)}
+.field label{font-size:13px;font-weight:500;color:var(--ink-soft)}
+.input{
+  font-family:var(--font-body);font-size:14px;color:var(--ink);
+  padding:11px 16px;border-radius:var(--r-sm);
+  border:1.5px solid rgba(92,97,127,.22);background:rgba(255,255,255,.66);
+  transition:border-color var(--t-fast),box-shadow var(--t-fast);
+}
+.input::placeholder{color:var(--ink-faint)}
+.input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 4px rgba(109,94,240,.14)}
+.input.error{border-color:var(--error)}
+.field .hint{font-size:12px;color:var(--ink-faint)}
+.field .hint.err{color:var(--error)}
+
+/* ============ Badges ============ */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:var(--r-full)}
+.badge i{width:6px;height:6px;border-radius:50%;font-style:normal}
+.b-mastered{background:rgba(18,168,123,.13);color:#0B7A59}
+.b-mastered i{background:var(--success)}
+.b-learning{background:var(--primary-soft);color:var(--primary-deep)}
+.b-learning i{background:var(--primary)}
+.b-todo{background:rgba(92,97,127,.12);color:var(--ink-soft)}
+.b-todo i{background:var(--ink-faint)}
+
+/* ============ Progress ============ */
+.progress{height:8px;border-radius:var(--r-full);background:rgba(92,97,127,.14);overflow:hidden}
+.progress>i{display:block;height:100%;border-radius:var(--r-full);background:linear-gradient(90deg,var(--aurora-violet),var(--aurora-cyan));transition:width var(--t-normal)}
+.progress.ok>i{background:linear-gradient(90deg,#12A87B,#3FB8E8)}
+
+/* ============ Cards ============ */
+.k-card{padding:var(--s5);transition:transform var(--t-normal),box-shadow var(--t-normal)}
+.k-card:hover{transform:translateY(-4px);box-shadow:0 18px 44px rgba(63,63,110,.16),0 1.5px 0 rgba(255,255,255,.9) inset}
+.k-card .k-title{font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:6px}
+.k-card .k-desc{font-size:13px;color:var(--ink-soft);margin-bottom:var(--s4)}
+.k-card .k-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink-faint)}
+
+/* ============ Elevation & radius demo ============ */
+.demo-shape{height:96px;display:grid;place-items:center;font-size:12px;color:var(--ink-soft);font-family:ui-monospace,monospace}
+.e-1{box-shadow:0 2px 8px rgba(63,63,110,.08)}
+.e-2{box-shadow:0 8px 24px rgba(63,63,110,.12)}
+.e-3{box-shadow:0 16px 44px rgba(63,63,110,.18)}
+
+footer{margin-top:var(--s8);font-size:12px;color:var(--ink-faint);text-align:center}
+</style>
+</head>
+<body>
+<div class="aurora"><i></i><i></i><i></i><i></i></div>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2.4" fill="currentColor"/><circle cx="5" cy="17" r="2.4" fill="currentColor"/><circle cx="19" cy="17" r="2.4" fill="currentColor"/><path d="M12 7.4 6.4 15M12 7.4 17.6 15M7.4 17h9.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".75"/></svg>
+      </div>
+      <div>
+        <h1>知元智学 · 设计规范</h1>
+        <p>KNOWVERSE DESIGN SYSTEM v1.0</p>
+      </div>
+    </div>
+    <div class="meta">
+      <strong>课程知识图谱智能建设与学习导航系统</strong>
+      杭州金阳智能科技 · A10 项目 · 渐变玻璃风 Aurora Glass
+    </div>
+  </header>
+
+  <!-- 01 Color -->
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>色彩系统</h2><span>Aurora 渐变玻璃 · 主色 + 语义色</span></div>
+    <div class="grid g-4">
+      <div class="swatch"><div class="chip" style="background:linear-gradient(135deg,#7C6CF0,#3FB8E8)"></div><div class="info"><b>Primary 极光渐变</b><code>#7C6CF0 → #3FB8E8</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#6D5EF0"></div><div class="info"><b>Primary 主色</b><code>#6D5EF0</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F87BA6"></div><div class="info"><b>Rose 辅助</b><code>#F87BA6</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F5B26B"></div><div class="info"><b>Amber 辅助</b><code>#F5B26B</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#12A87B"></div><div class="info"><b>Success 已掌握</b><code>#12A87B</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#E8930C"></div><div class="info"><b>Warning 待巩固</b><code>#E8930C</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#E5484D"></div><div class="info"><b>Error 薄弱</b><code>#E5484D</code></div></div>
+      <div class="swatch"><div class="chip" style="background:linear-gradient(180deg,#FFFFFF,#F2F4FB)"></div><div class="info"><b>Neutral 中性</b><code>#FFF → #F2F4FB</code></div></div>
+    </div>
+    <div class="glass panel" style="margin-top:16px">
+      <h3>文字对比度（WCAG AA）</h3>
+      <div class="grid g-3">
+        <div><span style="font-weight:700;color:#23263B">主文字 #23263B on 玻璃白</span><p class="t-caption">对比度 12.6 : 1 · AAA</p></div>
+        <div><span style="font-weight:500;color:#5C617F">次级文字 #5C617F</span><p class="t-caption">对比度 5.8 : 1 · AA</p></div>
+        <div><span style="font-weight:500;color:#4A3ED6">链接/强调 #4A3ED6</span><p class="t-caption">对比度 6.9 : 1 · AA</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 Typography -->
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>字体排印</h2><span>Sora 展示字体 × Noto Sans SC 正文 · clamp() 流式尺度</span></div>
+    <div class="glass panel">
+      <div class="type-row"><span class="type-label">Display / clamp(34–52px) / 800</span><span class="t-display">让每个知识点都被看见</span></div>
+      <div class="type-row"><span class="type-label">H1 / clamp(26–34px) / 700</span><span class="t-h1">知识图谱 · 学习导航</span></div>
+      <div class="type-row"><span class="type-label">H2 / 22px / 700</span><span class="t-h2">AIGC 驱动的课程建设</span></div>
+      <div class="type-row"><span class="type-label">Body / 16px / 400</span><span class="t-body">系统从课程大纲与教材内容中自动抽取知识点并构建图谱，结合学习者画像生成个性化学习路径，实现从内容到结构、再到导航的全链路智能。</span></div>
+      <div class="type-row"><span class="type-label">Caption / 13px / 400</span><span class="t-caption">更新于 3 分钟前 · 由 AI 助教生成摘要</span></div>
+    </div>
+  </section>
+
+  <!-- 03 Components -->
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>基础组件</h2><span>按钮 · 输入 · 徽章 · 进度</span></div>
+    <div class="grid g-2">
+      <div class="glass panel">
+        <h3>Buttons 按钮</h3>
+        <div class="btn-row">
+          <button class="btn btn-primary">开始学习</button>
+          <button class="btn btn-glass">预览图谱</button>
+          <button class="btn btn-ghost">稍后提醒</button>
+          <button class="btn btn-primary" disabled style="opacity:.55;pointer-events:none">已提交</button>
+        </div>
+      </div>
+      <div class="glass panel">
+        <h3>Badges 状态徽章</h3>
+        <div class="btn-row">
+          <span class="badge b-mastered"><i></i>已掌握</span>
+          <span class="badge b-learning"><i></i>学习中</span>
+          <span class="badge b-todo"><i></i>未开始</span>
+          <span class="badge" style="background:rgba(232,147,12,.13);color:#9A6207"><i style="background:var(--warning)"></i>待巩固</span>
+        </div>
+        <div style="margin-top:20px">
+          <h3>Progress 进度</h3>
+          <div class="progress" style="margin-bottom:10px"><i style="width:72%"></i></div>
+          <div class="progress ok"><i style="width:46%"></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid g-2" style="margin-top:16px">
+      <div class="glass panel">
+        <h3>Input 输入</h3>
+        <div class="field">
+          <label for="demo-search">搜索知识点</label>
+          <input class="input" id="demo-search" placeholder="例如：二叉树的遍历">
+          <span class="hint">支持自然语言检索图谱节点</span>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label for="demo-err">测验得分</label>
+          <input class="input error" id="demo-err" value="41" aria-invalid="true">
+          <span class="hint err">低于及格线，建议复习前置知识点「栈与队列」</span>
+        </div>
+      </div>
+      <div class="glass panel">
+        <h3>Elevation &amp; Radius</h3>
+        <div class="grid g-3" style="gap:12px">
+          <div class="glass demo-shape e-1" style="border-radius:10px">r-10 / e-1</div>
+          <div class="glass demo-shape e-2" style="border-radius:16px">r-16 / e-2</div>
+          <div class="glass demo-shape e-3" style="border-radius:22px">r-22 / e-3</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 Card pattern -->
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>知识卡片模式</h2><span>资源推荐的统一容器</span></div>
+    <div class="grid g-3">
+      <article class="glass k-card">
+        <div class="k-title">二叉搜索树</div>
+        <p class="k-desc">掌握中序遍历的性质与增删查改的对数复杂度证明。</p>
+        <div class="k-foot"><span class="badge b-learning"><i></i>学习中</span><span>预计 25 分钟</span></div>
+      </article>
+      <article class="glass k-card">
+        <div class="k-title">图的最短路径</div>
+        <p class="k-desc">Dijkstra 与 Floyd 算法的适用场景对比及代码实现。</p>
+        <div class="k-foot"><span class="badge b-mastered"><i></i>已掌握</span><span>已学 40 分钟</span></div>
+      </article>
+      <article class="glass k-card">
+        <div class="k-title">动态规划入门</div>
+        <p class="k-desc">从重叠子问题到状态转移方程的思维方式训练。</p>
+        <div class="k-foot"><span class="badge b-todo"><i></i>未开始</span><span>预计 35 分钟</span></div>
+      </article>
+    </div>
+  </section>
+
+  <footer>知元智学 KnowVerse · AIGC 课程知识图谱智能建设与学习导航系统 · 设计规范 v1.0 · 2026-09</footer>
+</div>
+</body>
+</html>

@@ -18,6 +18,7 @@ from app.models import (
     ClassroomUpdate,
     DashboardStats,
     DiagnosisResult,
+    ExerciseGenerateRequest,
     ExerciseResult,
     ImportCommitResult,
     ImportPreview,
@@ -200,6 +201,9 @@ def register_teacher(payload: TeacherRegisterRequest) -> User:
     username = payload.username.strip().lower()
     if len(username) < 3 or len(payload.password) < 8 or not payload.name.strip():
         raise ValueError("请填写有效用户名、姓名和至少 8 位密码")
+    organization = payload.organization.strip()
+    if not organization:
+        raise ValueError("学校名称不能为空")
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     application_id = f"application_{uuid.uuid4().hex[:12]}"
     try:
@@ -213,7 +217,7 @@ def register_teacher(payload: TeacherRegisterRequest) -> User:
                 """,
                 (
                     user_id, username, hash_password(payload.password), payload.name.strip(),
-                    payload.organization.strip() or "金扬智能示范学校", ORG_ID,
+                    organization, ORG_ID,
                     payload.email.strip(), payload.phone.strip(), payload.department.strip(), payload.title.strip(),
                 ),
             )
@@ -855,7 +859,9 @@ def diagnosis(classroom_id: str, user: User) -> DiagnosisResult:
     )
 
 
-def generate_exercises(classroom_id: str, user: User) -> list[ExerciseResult]:
+def generate_exercises(
+    classroom_id: str, user: User, request: ExerciseGenerateRequest | None = None,
+) -> list[ExerciseResult]:
     from app import graph_lifecycle
     from app.services import deepseek
 
@@ -866,10 +872,15 @@ def generate_exercises(classroom_id: str, user: User) -> list[ExerciseResult]:
     classroom = get_classroom(classroom_id, user)
     query = " ".join(node.name for node in weak_nodes)
     evidence, _ = graph_lifecycle.retrieve_evidence(classroom.course_id, query, user) if query else ([], [])
+    request = request or ExerciseGenerateRequest()
     try:
-        return deepseek.exercises(classroom.course_name, weak_nodes, evidence)
+        return deepseek.exercises(
+            classroom.course_name, weak_nodes, evidence, request.question_types, request.count,
+        )
     except ValueError:
-        return deepseek.offline_exercises(weak_nodes[:3], evidence)
+        return deepseek.offline_exercises(
+            weak_nodes, evidence, request.question_types, request.count,
+        )
 
 
 def _graph_dict(connection, course_id: str) -> dict:
