@@ -275,6 +275,7 @@ details.surface label { margin-bottom: 12px; }
 .answer-meta span { border-radius: 999px; padding: 3px 8px; color: #245ea8; background: #dbeaff; font-size: 11px; }
 .answer details { margin-top: 6px; }
 .answer summary { font-size: 12px; cursor: pointer; }
+.evidence-score { margin-top: 5px; display: block; color: #5273a8; font-family: "Cascadia Code", Consolas, monospace; font-size: 10px; line-height: 1.5; }
 
 .exercise-modal { max-height: min(780px, calc(100vh - 40px)); display: flex; flex-direction: column; overflow: hidden; }
 .exercise-config-heading { margin: 18px 0 10px; display: flex; align-items: center; justify-content: space-between; }

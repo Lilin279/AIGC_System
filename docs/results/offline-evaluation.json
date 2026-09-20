@@ -1,0 +1,996 @@
+{
+  "scope": {
+    "retrieval_cases": 20,
+    "path_cases": 8,
+    "dataset_type": "项目内人工构造小样本，不代表真实教学效果",
+    "reranker": "未纳入本轮实模型消融"
+  },
+  "retrieval_ablation": {
+    "bm25": {
+      "recall_at_5": 0.95,
+      "mrr": 0.8806,
+      "hit_at_1": 0.8
+    },
+    "vector": {
+      "recall_at_5": 0.95,
+      "mrr": 0.8946,
+      "hit_at_1": 0.85
+    },
+    "bm25_vector": {
+      "recall_at_5": 0.95,
+      "mrr": 0.9321,
+      "hit_at_1": 0.9
+    },
+    "bm25_vector_graph": {
+      "recall_at_5": 1.0,
+      "mrr": 0.9375,
+      "hit_at_1": 0.9
+    }
+  },
+  "learning_path": {
+    "cases": 8,
+    "hit_at_6": 1.0,
+    "mrr": 0.45,
+    "prerequisite_constraint_accuracy": 1.0
+  },
+  "retrieval_cases": [
+    {
+      "case_id": "RET001",
+      "course_id": "python_intro",
+      "question": "哪个运行环境负责执行源代码并返回报错信息",
+      "bm25_top5": [
+        "py_02",
+        "py_15",
+        "py_09",
+        "py_05",
+        "py_07"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_02",
+        "py_15",
+        "py_08",
+        "py_09",
+        "py_06"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_02",
+        "py_15",
+        "py_09",
+        "py_08",
+        "py_06"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_02",
+        "py_15",
+        "py_09",
+        "py_08",
+        "py_01"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET002",
+      "course_id": "python_intro",
+      "question": "怎样给一份数据起名字并在程序中反复读取",
+      "bm25_top5": [
+        "py_14",
+        "py_03",
+        "py_12",
+        "py_10",
+        "py_15"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 0.5,
+      "vector_top5": [
+        "py_14",
+        "py_12",
+        "py_08",
+        "py_03",
+        "py_09"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 0.25,
+      "bm25_vector_top5": [
+        "py_14",
+        "py_03",
+        "py_12",
+        "py_04",
+        "py_01"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 0.5,
+      "bm25_vector_graph_top5": [
+        "py_14",
+        "py_03",
+        "py_12",
+        "py_04",
+        "py_01"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 0.5
+    },
+    {
+      "case_id": "RET003",
+      "course_id": "python_intro",
+      "question": "整数小数文本和真假值为什么需要分类",
+      "bm25_top5": [
+        "py_13",
+        "py_04",
+        "py_01",
+        "py_02",
+        "py_03"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 0.5,
+      "vector_top5": [
+        "py_04",
+        "py_13",
+        "py_14",
+        "py_20",
+        "py_05"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_04",
+        "py_13",
+        "py_14",
+        "py_20",
+        "py_05"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_04",
+        "py_13",
+        "py_14",
+        "py_05",
+        "py_03"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET004",
+      "course_id": "python_intro",
+      "question": "程序需要按照真假判断走不同分支时应学习什么",
+      "bm25_top5": [
+        "py_06",
+        "py_03",
+        "py_15",
+        "py_17",
+        "py_01"
+      ],
+      "bm25_recall_at_5": 0.0,
+      "bm25_reciprocal_rank": 0.111111,
+      "vector_top5": [
+        "py_01",
+        "py_06",
+        "py_20",
+        "py_19",
+        "py_13"
+      ],
+      "vector_recall_at_5": 0.0,
+      "vector_reciprocal_rank": 0.142857,
+      "bm25_vector_top5": [
+        "py_06",
+        "py_01",
+        "py_20",
+        "py_17",
+        "py_19"
+      ],
+      "bm25_vector_recall_at_5": 0.0,
+      "bm25_vector_reciprocal_rank": 0.142857,
+      "bm25_vector_graph_top5": [
+        "py_06",
+        "py_01",
+        "py_20",
+        "py_07",
+        "py_04"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 0.25
+    },
+    {
+      "case_id": "RET005",
+      "course_id": "python_intro",
+      "question": "需要重复处理一组元素时应使用哪类结构",
+      "bm25_top5": [
+        "py_08",
+        "py_11",
+        "py_12",
+        "py_03",
+        "py_01"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_08",
+        "py_09",
+        "py_11",
+        "py_12",
+        "py_15"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_08",
+        "py_11",
+        "py_12",
+        "py_17",
+        "py_15"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_08",
+        "py_11",
+        "py_12",
+        "py_09",
+        "py_17"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET006",
+      "course_id": "python_intro",
+      "question": "怎样把一段逻辑封装起来供多处重复使用",
+      "bm25_top5": [
+        "py_09",
+        "py_08",
+        "py_01",
+        "py_02",
+        "py_03"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_09",
+        "py_08",
+        "py_13",
+        "py_11",
+        "py_07"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_09",
+        "py_08",
+        "py_01",
+        "py_13",
+        "py_11"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_09",
+        "py_08",
+        "py_01",
+        "py_07",
+        "py_02"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET007",
+      "course_id": "python_intro",
+      "question": "调用一个功能时如何把外部数据交给它",
+      "bm25_top5": [
+        "py_10",
+        "py_12",
+        "py_03",
+        "py_04",
+        "py_14"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_10",
+        "py_14",
+        "py_03",
+        "py_15",
+        "py_20"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_10",
+        "py_14",
+        "py_03",
+        "py_12",
+        "py_04"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_10",
+        "py_14",
+        "py_03",
+        "py_04",
+        "py_09"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET008",
+      "course_id": "python_intro",
+      "question": "哪种可变容器适合按顺序保存多个成绩",
+      "bm25_top5": [
+        "py_11",
+        "py_12",
+        "py_06",
+        "py_20",
+        "py_03"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_11",
+        "py_12",
+        "py_03",
+        "py_20",
+        "py_07"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_11",
+        "py_12",
+        "py_03",
+        "py_20",
+        "py_07"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_11",
+        "py_12",
+        "py_03",
+        "py_01",
+        "py_04"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET009",
+      "course_id": "python_intro",
+      "question": "哪种容器适合用姓名对应成绩这样的键值方式保存信息",
+      "bm25_top5": [
+        "py_12",
+        "py_11",
+        "py_02",
+        "py_20",
+        "py_03"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_12",
+        "py_11",
+        "py_03",
+        "py_13",
+        "py_20"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_12",
+        "py_11",
+        "py_03",
+        "py_20",
+        "py_02"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_12",
+        "py_11",
+        "py_03",
+        "py_02",
+        "py_01"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET010",
+      "course_id": "python_intro",
+      "question": "怎样捕获运行错误让程序不会直接崩溃",
+      "bm25_top5": [
+        "py_15",
+        "py_02",
+        "py_03",
+        "py_06",
+        "py_17"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "py_15",
+        "py_01",
+        "py_02",
+        "py_06",
+        "py_08"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "py_15",
+        "py_02",
+        "py_01",
+        "py_06",
+        "py_08"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "py_15",
+        "py_02",
+        "py_01",
+        "py_03",
+        "py_19"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET011",
+      "course_id": "database_systems",
+      "question": "怎样用二维表来表达现实中的实体及其联系",
+      "bm25_top5": [
+        "db_03",
+        "db_08",
+        "db_06",
+        "db_09",
+        "db_01"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_03",
+        "db_06",
+        "db_09",
+        "db_04",
+        "db_07"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_03",
+        "db_06",
+        "db_09",
+        "db_08",
+        "db_04"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_03",
+        "db_06",
+        "db_09",
+        "db_08",
+        "db_04"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET012",
+      "course_id": "database_systems",
+      "question": "哪个字段能够唯一确定表中的一条记录",
+      "bm25_top5": [
+        "db_07",
+        "db_11",
+        "db_12",
+        "db_06",
+        "db_19"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_07",
+        "db_19",
+        "db_05",
+        "db_08",
+        "db_16"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_07",
+        "db_19",
+        "db_05",
+        "db_11",
+        "db_08"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_07",
+        "db_19",
+        "db_05",
+        "db_08",
+        "db_06"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET013",
+      "course_id": "database_systems",
+      "question": "什么约束可以表达两张表之间的引用",
+      "bm25_top5": [
+        "db_11",
+        "db_08",
+        "db_03",
+        "db_06",
+        "db_02"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 0.5,
+      "vector_top5": [
+        "db_08",
+        "db_11",
+        "db_10",
+        "db_06",
+        "db_14"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_08",
+        "db_11",
+        "db_03",
+        "db_06",
+        "db_02"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_08",
+        "db_11",
+        "db_03",
+        "db_06",
+        "db_02"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET014",
+      "course_id": "database_systems",
+      "question": "怎样通过设计规范减少表中冗余和更新异常",
+      "bm25_top5": [
+        "db_10",
+        "db_07",
+        "db_06",
+        "db_15",
+        "db_20"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_18",
+        "db_10",
+        "db_06",
+        "db_20",
+        "db_08"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 0.5,
+      "bm25_vector_top5": [
+        "db_10",
+        "db_18",
+        "db_06",
+        "db_20",
+        "db_08"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_10",
+        "db_18",
+        "db_06",
+        "db_08",
+        "db_07"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET015",
+      "course_id": "database_systems",
+      "question": "属性之间一个值能够确定另一个值属于什么约束",
+      "bm25_top5": [
+        "db_11",
+        "db_07",
+        "db_12",
+        "db_09",
+        "db_08"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_11",
+        "db_08",
+        "db_10",
+        "db_13",
+        "db_02"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_11",
+        "db_08",
+        "db_07",
+        "db_10",
+        "db_09"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_11",
+        "db_08",
+        "db_07",
+        "db_10",
+        "db_06"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET016",
+      "course_id": "database_systems",
+      "question": "一组数据库操作需要作为不可分割的整体执行",
+      "bm25_top5": [
+        "db_12",
+        "db_04",
+        "db_17",
+        "db_01",
+        "db_13"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_12",
+        "db_04",
+        "db_18",
+        "db_16",
+        "db_14"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_12",
+        "db_04",
+        "db_01",
+        "db_18",
+        "db_02"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_12",
+        "db_04",
+        "db_01",
+        "db_02",
+        "db_14"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET017",
+      "course_id": "database_systems",
+      "question": "多个操作同时运行时怎样维持数据一致",
+      "bm25_top5": [
+        "db_14",
+        "db_12",
+        "db_05",
+        "db_02",
+        "db_13"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_14",
+        "db_12",
+        "db_20",
+        "db_13",
+        "db_18"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_14",
+        "db_12",
+        "db_13",
+        "db_20",
+        "db_05"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_14",
+        "db_12",
+        "db_13",
+        "db_20",
+        "db_15"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET018",
+      "course_id": "database_systems",
+      "question": "为了加快查询而建立的辅助数据结构是什么",
+      "bm25_top5": [
+        "db_16",
+        "db_02",
+        "db_09",
+        "db_05",
+        "db_17"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_16",
+        "db_05",
+        "db_04",
+        "db_18",
+        "db_17"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_16",
+        "db_05",
+        "db_04",
+        "db_18",
+        "db_09"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_16",
+        "db_05",
+        "db_04",
+        "db_18",
+        "db_17"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET019",
+      "course_id": "database_systems",
+      "question": "哪种多路平衡树适合范围查询和叶子链表扫描",
+      "bm25_top5": [
+        "db_17",
+        "db_18",
+        "db_16",
+        "db_04",
+        "db_05"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_17",
+        "db_18",
+        "db_05",
+        "db_06",
+        "db_04"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_17",
+        "db_18",
+        "db_05",
+        "db_04",
+        "db_06"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_17",
+        "db_18",
+        "db_05",
+        "db_04",
+        "db_16"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    },
+    {
+      "case_id": "RET020",
+      "course_id": "database_systems",
+      "question": "系统怎样依据统计信息选择成本更低的执行计划",
+      "bm25_top5": [
+        "db_18",
+        "db_04",
+        "db_01",
+        "db_14",
+        "db_12"
+      ],
+      "bm25_recall_at_5": 1.0,
+      "bm25_reciprocal_rank": 1.0,
+      "vector_top5": [
+        "db_18",
+        "db_12",
+        "db_16",
+        "db_20",
+        "db_04"
+      ],
+      "vector_recall_at_5": 1.0,
+      "vector_reciprocal_rank": 1.0,
+      "bm25_vector_top5": [
+        "db_18",
+        "db_12",
+        "db_04",
+        "db_01",
+        "db_16"
+      ],
+      "bm25_vector_recall_at_5": 1.0,
+      "bm25_vector_reciprocal_rank": 1.0,
+      "bm25_vector_graph_top5": [
+        "db_18",
+        "db_12",
+        "db_04",
+        "db_16",
+        "db_14"
+      ],
+      "bm25_vector_graph_recall_at_5": 1.0,
+      "bm25_vector_graph_reciprocal_rank": 1.0
+    }
+  ],
+  "path_cases": [
+    {
+      "case_id": "PATH001",
+      "ranked_node_ids": [
+        "py_02",
+        "py_16",
+        "py_18",
+        "py_01",
+        "py_06",
+        "py_11"
+      ],
+      "expected_next_node_ids": [
+        "py_02"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 1.0,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH002",
+      "ranked_node_ids": [
+        "py_16",
+        "py_18",
+        "py_03",
+        "py_01",
+        "py_06",
+        "py_11"
+      ],
+      "expected_next_node_ids": [
+        "py_03"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 0.333333,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH003",
+      "ranked_node_ids": [
+        "py_16",
+        "py_18",
+        "py_04",
+        "py_01",
+        "py_06",
+        "py_11"
+      ],
+      "expected_next_node_ids": [
+        "py_04"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 0.333333,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH004",
+      "ranked_node_ids": [
+        "py_16",
+        "py_18",
+        "py_07",
+        "py_01",
+        "py_06",
+        "py_11"
+      ],
+      "expected_next_node_ids": [
+        "py_07"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 0.333333,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH005",
+      "ranked_node_ids": [
+        "db_01",
+        "db_06",
+        "db_11",
+        "db_12",
+        "db_16",
+        "db_07"
+      ],
+      "expected_next_node_ids": [
+        "db_01"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 1.0,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH006",
+      "ranked_node_ids": [
+        "db_06",
+        "db_11",
+        "db_12",
+        "db_16",
+        "db_02",
+        "db_07"
+      ],
+      "expected_next_node_ids": [
+        "db_02"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 0.2,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH007",
+      "ranked_node_ids": [
+        "db_06",
+        "db_11",
+        "db_12",
+        "db_16",
+        "db_04",
+        "db_07"
+      ],
+      "expected_next_node_ids": [
+        "db_04"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 0.2,
+      "constraint_valid": true
+    },
+    {
+      "case_id": "PATH008",
+      "ranked_node_ids": [
+        "db_01",
+        "db_06",
+        "db_11",
+        "db_16",
+        "db_14",
+        "db_07"
+      ],
+      "expected_next_node_ids": [
+        "db_14"
+      ],
+      "hit_at_6": true,
+      "reciprocal_rank": 0.2,
+      "constraint_valid": true
+    }
+  ]
+}

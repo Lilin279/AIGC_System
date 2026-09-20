@@ -12,7 +12,7 @@
 - 删除课件前预览影响；默认选择性回滚单一来源节点/关系，保留共享来源和人工修订。
 - 节点与关系完整增删改，所有手工修订进入版本与来源记录。
 - 按学生和班级隔离学习进度，路径顺序由前置关系确定，DeepSeek 基于证据生成诊断解释和练习，练习支持自选题型（基础题/应用题/易错题）与数量。
-- SQLite FTS5 中文 2/3-gram 索引配合 BM25 排序、知识点匹配和图谱邻居扩展，形成可溯源 GraphRAG。
+- SQLite FTS5 中文 2/3-gram、BM25、中文 Embedding、Qdrant 向量检索、Neo4j 邻居扩展和 Cross-Encoder 重排序组成可降级的多通道 GraphRAG。
 - 管理员独立控制台：教师审核、全校用户/班级/课程、两步批量导入、工单和审计日志。
 - 个人资料、头像、密码、工单附件、站内通知；导入账号首次登录强制改密。
 - SQLite 保存业务数据；Neo4j 保存已确认图谱并实际参与前置关系查询和 GraphRAG 两跳邻居召回，连接失败自动降级。
@@ -80,6 +80,12 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 模型和 JSON Output 参数依据 [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/) 与 [JSON Output](https://api-docs.deepseek.com/guides/json_mode/) 官方文档。
 
 系统不会记录 Key、提示正文或课件内容；`ai_usage_logs` 仅保存模型、能力、Token、耗时与状态。真实联调和 24 题问答验收见 `docs/13_ai_integration_and_acceptance.md`。
+
+## 多通道混合 GraphRAG
+
+设置 `HYBRID_RAG_ENABLED=true` 后，系统使用 `BAAI/bge-small-zh-v1.5` 生成中文向量，使用 Qdrant 本地持久化向量库，并通过 `BAAI/bge-reranker-base` 对候选证据重排序。首次使用需要联网下载模型；模型或向量库异常时自动回退到 BM25 与 Neo4j 图检索。
+
+检索结果同时返回 BM25、向量、图谱、来源、融合和重排分数。完整配置、评分公式与评测方式见 `docs/14_hybrid_graphrag.md`；知识抽取、问答、检索消融、推荐路径和并发性能的实测数据见 `docs/15_evaluation_report.md`。
 
 ## 自动化测试
 

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "visual-check",
+  "evidenceKind": "automated-browser",
+  "status": "fail",
+  "visualReview": "pending",
+  "artifact": {
+    "path": "D:\\AIGC\\docs\\architecture\\coursegraph-current-architecture.html",
+    "sha256": "e268132645f1fd1789d9807fda9f14319f1dfb583a5981713a6841bc1023a9ae",
+    "bytes": 729748
+  },
+  "state": {
+    "detail": "read",
+    "motion": "still"
+  },
+  "chrome": {
+    "status": "available",
+    "executable": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/visual-check-runtime",
+      "severity": "error",
+      "message": "visual-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "D:\\AIGC\\docs\\architecture\\coursegraph-current-architecture.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools process exit failed: Chrome closed with exit code 0\nChrome process: exit code 0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun visual-check"
+      ]
+    }
+  ],
+  "containment": {
+    "status": "fail",
+    "viewports": []
+  },
+  "readability": {
+    "status": "fail",
+    "minimumProjectedNodeTextPx": 6,
+    "viewports": []
+  },
+  "viewerChrome": {
+    "status": "fail",
+    "viewports": []
+  },
+  "captures": {
+    "status": "fail",
+    "screenshots": [],
+    "contactSheet": null
+  },
+  "sidecars": {
+    "receipt": "coursegraph-current-architecture.visual-check.json",
+    "contactSheet": "coursegraph-current-architecture.visual-check.html"
+  },
+  "error": "Chrome DevTools process exit failed: Chrome closed with exit code 0\nChrome process: exit code 0."
+}

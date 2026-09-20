@@ -376,11 +376,11 @@ def expand_neighbors(course_id: str, node_ids: list[str], limit: int = 5) -> lis
                     MATCH path=(matched:KnowledgeNode {course_id: $course_id})-[:COURSE_RELATION*1..2]-(neighbor:KnowledgeNode {course_id: $course_id})
                     WHERE matched.id IN $node_ids
                     UNWIND relationships(path) AS r
-                    WITH DISTINCT r, startNode(r) AS source, endNode(r) AS target
+                    WITH r, startNode(r) AS source, endNode(r) AS target, min(length(path)) AS hop
                     RETURN r.id AS id, source.id AS source_id, source.name AS source_name,
                            target.id AS target_id, target.name AS target_name,
-                           r.type AS relation, r.label AS label
-                    ORDER BY r.id LIMIT $limit
+                           r.type AS relation, r.label AS label, hop
+                    ORDER BY hop, r.id LIMIT $limit
                     """,
                     "parameters": {"course_id": course_id, "node_ids": node_ids, "limit": max(1, min(limit, 20))},
                     "resultDataContents": ["row"],

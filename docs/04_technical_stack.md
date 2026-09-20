@@ -18,4 +18,4 @@
 
 - LLM：DeepSeek / 通义千问用于实体识别、关系抽取和问答生成。
 - Neo4j：用于生产级图谱存储、Cypher 查询和图遍历。
-- GraphRAG：将图谱节点、文档片段和大模型生成结合，降低幻觉。
+- GraphRAG：中文 N-gram/FTS5/BM25、BGE 中文 Embedding、Qdrant、Neo4j 一至两跳扩展和 BGE Cross-Encoder 重排序。

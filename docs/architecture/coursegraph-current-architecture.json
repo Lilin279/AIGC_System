@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "CourseGraph AI 当前技术架构",
+    "locale": "zh-CN",
+    "output": "coursegraph-current-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1380, 960],
+    "views": [
+      {"id": "access", "label": "访问与权限", "focus": ["web", "api", "auth"], "note": "学生、教师和管理员通过统一 Web 平台访问，后端执行会话认证、角色授权和课程数据隔离。"},
+      {"id": "build", "label": "图谱构建与审核", "focus": ["api", "lifecycle", "extractor", "deepseek_extract", "files", "sqlite", "neo4j"], "note": "课件解析、DeepSeek 联合抽取、截断补全、候选审核、来源记录和正式图谱发布形成闭环。"},
+      {"id": "rag", "label": "混合 GraphRAG", "focus": ["api", "graphrag", "sqlite", "neo4j", "vector", "deepseek_generate"], "note": "统一融合 BM25、中文向量、图谱路径和来源可信度，再生成带编号证据的回答。"},
+      {"id": "consistency", "label": "版本与索引一致性", "focus": ["lifecycle", "files", "sqlite", "neo4j", "vector"], "note": "课件变更使候选版本和向量索引失效；正式版本同步至 Neo4j，文本块按课程重建向量。"},
+      {"id": "fallback", "label": "降级与可解释性", "focus": ["graphrag", "sqlite", "neo4j", "vector", "deepseek_generate"], "note": "外部组件异常时保留可用通道，并向前端返回运行模式、引用和各通道评分。"}
+    ]
+  },
+  "components": [
+    {"id": "web", "type": "frontend", "label": "CourseGraph Web 平台", "sublabel": "学生 · 教师 · 管理员工作台", "tag": "React + TypeScript + Vite", "pos": [25, 420], "size": [210, 82]},
+    {"id": "api", "type": "backend", "label": "FastAPI 应用层", "sublabel": "REST API · 业务编排 · 课程隔离", "tag": "Python :8000", "pos": [300, 420], "size": [210, 82]},
+    {"id": "auth", "type": "security", "label": "认证与权限控制", "sublabel": "会话令牌 · RBAC · 数据边界", "tag": "学生 / 教师 / 管理员", "pos": [300, 105], "size": [210, 80]},
+    {"id": "extractor", "type": "backend", "label": "知识联合抽取器", "sublabel": "结构校验 · 去重 · 截断增量补全", "tag": "实体 + 关系 + 来源", "pos": [570, 70], "size": [220, 86]},
+    {"id": "lifecycle", "type": "backend", "label": "图谱生命周期服务", "sublabel": "候选审核 · 发布 · 回滚 · 来源联动", "tag": "candidate / active / rejected", "pos": [570, 265], "size": [220, 88]},
+    {"id": "graphrag", "type": "backend", "label": "多通道 GraphRAG", "sublabel": "召回 · 融合 · 重排 · 引用组装", "tag": "BM25 + Vector + Graph + Source", "pos": [570, 555], "size": [220, 90]},
+    {"id": "deepseek_extract", "type": "external", "label": "DeepSeek 抽取能力", "sublabel": "实体关系联合抽取 · 增量补全", "tag": "外部大模型 API", "pos": [930, 70], "size": [220, 86]},
+    {"id": "deepseek_generate", "type": "external", "label": "DeepSeek 生成能力", "sublabel": "证据约束回答 · 诊断 · 练习", "tag": "外部大模型 API", "pos": [570, 790], "size": [220, 86]},
+    {"id": "files", "type": "database", "label": "课程材料存储", "sublabel": "MD · TXT · PDF · DOCX · PPTX", "tag": "原始课件与解析文本", "pos": [930, 225], "size": [220, 78]},
+    {"id": "sqlite", "type": "database", "label": "SQLite + FTS5", "sublabel": "业务数据 · 文本块 · BM25 · 图谱版本", "tag": "来源记录与权威状态", "pos": [930, 385], "size": [220, 86]},
+    {"id": "neo4j", "type": "database", "label": "Neo4j 图数据库", "sublabel": "正式图谱 · 一至二跳邻居扩展", "tag": "失败时回退 SQLite 图关系", "pos": [930, 555], "size": [220, 86]},
+    {"id": "vector", "type": "database", "label": "Qdrant + FastEmbed", "sublabel": "课程级向量索引 · 中文语义召回", "tag": "BGE + 可选 Cross-Encoder", "pos": [930, 730], "size": [220, 88]}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "浏览器访问层", "wraps": ["web"], "pad": 24},
+    {"kind": "security-group", "label": "CourseGraph 后端可信边界", "wraps": ["api", "auth", "extractor", "lifecycle", "graphrag", "files", "sqlite", "neo4j", "vector"], "pad": 30},
+    {"kind": "region", "label": "DeepSeek 外部抽取 API", "wraps": ["deepseek_extract"], "pad": 24},
+    {"kind": "region", "label": "DeepSeek 外部生成 API", "wraps": ["deepseek_generate"], "pad": 24}
+  ],
+  "connections": [
+    {"id": "web-api", "from": "web", "to": "api", "label": "HTTPS · REST/JSON", "variant": "emphasis", "labelAt": [268, 516], "width": 2},
+    {"id": "api-auth", "from": "api", "to": "auth", "label": "认证、角色与课程权限", "variant": "security", "labelAt": [400, 300]},
+    {"id": "api-lifecycle", "from": "api", "to": "lifecycle", "label": "课件、审核、版本操作", "variant": "emphasis", "labelAt": [540, 367]},
+    {"id": "api-rag", "from": "api", "to": "graphrag", "label": "问答、诊断、学习路径", "variant": "emphasis", "labelDy": 22},
+    {"id": "lifecycle-extractor", "from": "lifecycle", "to": "extractor", "label": "异步抽取任务", "variant": "dashed", "labelDx": -78},
+    {"id": "extract-deepseek", "from": "extractor", "to": "deepseek_extract", "label": "结构化提示与增量补全", "variant": "dashed", "labelDy": -24},
+    {"id": "lifecycle-files", "from": "lifecycle", "to": "files", "label": "保存、解析课程材料", "labelDy": -24},
+    {"id": "lifecycle-sqlite", "from": "lifecycle", "to": "sqlite", "label": "候选图谱、来源、FTS5", "labelDy": 26},
+    {"id": "sqlite-neo4j", "from": "sqlite", "to": "neo4j", "label": "审核发布后同步", "variant": "dashed", "fromSide": "right", "toSide": "right", "via": [[1235, 428], [1235, 598]], "labelAt": [1190, 505]},
+    {"id": "sqlite-vector", "from": "sqlite", "to": "vector", "label": "文本块、课程指纹与置脏状态", "variant": "dashed", "fromSide": "right", "toSide": "right", "via": [[1320, 428], [1320, 774]], "labelAt": [1280, 684]},
+    {"id": "rag-bm25", "from": "graphrag", "to": "sqlite", "label": "BM25 + 知识点 + 来源可信度", "labelDy": -24},
+    {"id": "rag-graph", "from": "graphrag", "to": "neo4j", "label": "一至二跳图谱扩展", "labelAt": [910, 540]},
+    {"id": "rag-vector", "from": "graphrag", "to": "vector", "label": "Embedding 召回与重排序", "labelDy": 24},
+    {"id": "rag-generate", "from": "graphrag", "to": "deepseek_generate", "label": "编号证据与图谱关系", "variant": "emphasis", "labelAt": [790, 700], "width": 2}
+  ],
+  "cards": [
+    {"dot": "violet", "title": "图谱生命周期", "items": ["课件解析 → 联合抽取 → 候选版本 → 教师审核 → 正式图谱", "节点和关系分别保存文档、页码、原文、置信度与人工修正状态"]},
+    {"dot": "cyan", "title": "混合检索评分", "items": ["S = 0.30·BM25 + 0.30·Vector + 0.25·Graph + 0.15·Source", "最终分数可融合 Cross-Encoder；前端展示引用、模式与各通道评分"]},
+    {"dot": "emerald", "title": "课程级一致性", "items": ["模型名、文本块 ID 和内容共同生成课程索引指纹", "课件变化使候选版本和索引失效，仅重建对应课程的向量数据"]},
+    {"dot": "amber", "title": "韧性与职责边界", "items": ["Qdrant、Reranker 或 Neo4j 异常时自动降级，不阻断基础问答", "DeepSeek 负责抽取与解释；学习顺序由可复核的图约束算法决定"]}
+  ]
+}

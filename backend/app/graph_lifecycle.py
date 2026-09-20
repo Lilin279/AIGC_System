@@ -19,7 +19,7 @@ from app.models import (
     User,
 )
 from app.platform import _audit, _graph_dict, _insert_chunks
-from app.services import deepseek
+from app.services import deepseek, hybrid_retrieval
 from app.services.retrieval import fts_query, search_tokens
 
 
@@ -32,6 +32,7 @@ def document_saved(document_id: str, course_id: str, content: str, user: User) -
         )
         _insert_chunks(connection, document_id, course_id, content)
         _audit(connection, user, "document.upload", "document", document_id, {"course_id": course_id})
+    hybrid_retrieval.mark_course_dirty(course_id)
 
 
 def create_extraction_job(course_id: str, user: User) -> ExtractionJob:
@@ -449,6 +450,7 @@ def delete_document(course_id: str, document_id: str, rollback_graph: bool, user
         path.unlink()
     from app.services.neo4j_adapter import sync_confirmed_graph
     sync_confirmed_graph(course_id, graph, version_id)
+    hybrid_retrieval.mark_course_dirty(course_id)
     return {
         "deleted": document_id,
         "rollback_graph": rollback_graph,
@@ -512,13 +514,27 @@ def retrieve_evidence(course_id: str, query: str, user: User, limit: int = 5) ->
                     WHERE document_chunks_fts MATCH ? AND document_chunks_fts.course_id = ? AND d.status = 'active'
                     ORDER BY bm25(document_chunks_fts) LIMIT ?
                     """,
-                    (query_expression, course_id, limit),
+                    (query_expression, course_id, max(limit, 8) if hybrid_retrieval.configured() else limit),
                 ).fetchall()]
             except Exception:
                 chunks = []
-        nodes = [dict(row) for row in connection.execute("SELECT * FROM nodes WHERE course_id = ?", (course_id,)).fetchall()]
+        nodes = [dict(row) for row in connection.execute(
+            """
+            SELECT n.*,
+              COALESCE((SELECT MAX(ns.confidence) FROM node_sources ns WHERE ns.node_id = n.id), 0) AS source_confidence,
+              COALESCE((SELECT MAX(ns.manual_override) FROM node_sources ns WHERE ns.node_id = n.id), 0) AS manual_override
+            FROM nodes n WHERE n.course_id = ?
+            """,
+            (course_id,),
+        ).fetchall()]
         edges = [dict(row) for row in connection.execute(
-            "SELECT source, target, label FROM edges WHERE course_id = ?", (course_id,)
+            """
+            SELECT e.id, e.source, e.target, e.label,
+              COALESCE((SELECT MAX(es.confidence) FROM edge_sources es WHERE es.edge_id = e.id), 0) AS source_confidence,
+              COALESCE((SELECT MAX(es.manual_override) FROM edge_sources es WHERE es.edge_id = e.id), 0) AS manual_override
+            FROM edges e WHERE e.course_id = ?
+            """,
+            (course_id,),
         ).fetchall()]
     ranked_nodes = sorted(
         nodes,
@@ -534,6 +550,7 @@ def retrieve_evidence(course_id: str, query: str, user: User, limit: int = 5) ->
             "id": row["chunk_id"], "source": f"{row['filename']}{page}", "excerpt": row["content"][:500],
             "type": "document", "document_id": row["document_id"], "page_no": row["page_no"],
             "bm25_score": round(float(row["bm25_score"]), 6), "rank": rank,
+            "source_score": min(1.0, 0.8 + (0.2 if row["page_no"] else 0.0)),
         })
     ranked_nodes = [row for row in ranked_nodes if any(
         term in f"{row['name']} {row['definition']} {row['example']}".casefold() for term in terms
@@ -545,36 +562,77 @@ def retrieve_evidence(course_id: str, query: str, user: User, limit: int = 5) ->
         )
         for row in ranked_nodes[:3]
     ]
+    citation_rows = {row["id"]: row for row in ranked_nodes[:3]}
     for node in citations:
-        evidence.append({"source": f"知识点：{node.name}", "excerpt": node.definition, "type": "graph"})
+        row = citation_rows[node.id]
+        source_score = float(row.get("source_confidence") or 0.65)
+        if row.get("manual_override"):
+            source_score = 1.0
+        match_score = sum(
+            max(4, len(term)) for term in terms
+            if term in f"{row['name']} {row['definition']} {row['example']}".casefold()
+        )
+        evidence.append({
+            "id": node.id, "source": f"知识点：{node.name}", "excerpt": node.definition, "type": "graph",
+            "node_match_score": match_score, "graph_score": 1.0, "source_score": source_score,
+        })
     citation_ids = {node.id for node in citations}
+    edge_by_id = {edge["id"]: edge for edge in edges}
     from app.services.neo4j_adapter import expand_neighbors
-    neo4j_neighbors = expand_neighbors(course_id, list(citation_ids), max(1, 8 - len(evidence)))
+    relation_limit = 8 if hybrid_retrieval.configured() else max(1, 8 - len(evidence))
+    neo4j_neighbors = expand_neighbors(course_id, list(citation_ids), relation_limit)
     if neo4j_neighbors is not None:
         for edge in neo4j_neighbors:
+            source_row = edge_by_id.get(edge["id"], {})
+            source_score = float(source_row.get("source_confidence") or 0.75)
+            if source_row.get("manual_override"):
+                source_score = 1.0
             evidence.append({
                 "source": "Neo4j 图谱邻居扩展",
                 "excerpt": f"{edge['source_name']} -[{edge['label']}]-> {edge['target_name']}",
                 "type": "relation",
                 "backend": "neo4j",
                 "relation_id": edge["id"],
+                "graph_score": 1.0 / max(1, int(edge.get("hop", 1))),
+                "source_score": source_score,
             })
-            if len(evidence) >= 8:
+            if not hybrid_retrieval.configured() and len(evidence) >= 8:
                 break
     else:
         for edge in edges:
             if edge["source"] in citation_ids or edge["target"] in citation_ids:
                 source = next((node["name"] for node in nodes if node["id"] == edge["source"]), edge["source"])
                 target = next((node["name"] for node in nodes if node["id"] == edge["target"]), edge["target"])
+                source_score = float(edge.get("source_confidence") or 0.65)
+                if edge.get("manual_override"):
+                    source_score = 1.0
                 evidence.append({
                     "source": "SQLite 图谱邻居扩展",
                     "excerpt": f"{source} -[{edge['label']}]-> {target}",
                     "type": "relation",
                     "backend": "sqlite",
+                    "relation_id": edge["id"],
+                    "graph_score": 0.75,
+                    "source_score": source_score,
                 })
-                if len(evidence) >= 8:
+                if not hybrid_retrieval.configured() and len(evidence) >= 8:
                     break
-    return evidence[:8], citations
+    if not hybrid_retrieval.configured():
+        return evidence[:8], citations
+
+    vector_evidence, vector_mode = hybrid_retrieval.semantic_candidates(
+        course_id, query, max(8, limit * 2)
+    )
+    ranked = hybrid_retrieval.rank_candidates(
+        query, evidence + vector_evidence, limit=8, retrieval_mode=vector_mode,
+    )
+    citation_by_id = {node.id: node for node in citations}
+    ranked_citations = [
+        citation_by_id[item["id"]]
+        for item in ranked.evidence
+        if item.get("type") == "graph" and item.get("id") in citation_by_id
+    ]
+    return ranked.evidence, ranked_citations
 
 
 def graphrag_answer(course_id: str, question: str, user: User) -> QAResult:
@@ -582,14 +640,24 @@ def graphrag_answer(course_id: str, question: str, user: User) -> QAResult:
     answer = deepseek.answer_with_evidence(question, evidence)
     confidence = _qa_confidence(evidence, citations)
     graph_backend = "+neo4j" if any(item.get("backend") == "neo4j" for item in evidence) else ""
+    retrieval_mode = next((item.get("retrieval_mode") for item in evidence if item.get("retrieval_mode")), "")
+    hybrid_mode = f"+{retrieval_mode}" if retrieval_mode else ""
     return QAResult(
         answer=answer, citations=citations, confidence=confidence,
         evidence=evidence,
-        mode=("deepseek-graphrag" if deepseek.configured() else "offline-graphrag") + graph_backend,
+        mode=("deepseek-graphrag" if deepseek.configured() else "offline-graphrag") + graph_backend + hybrid_mode,
     )
 
 
 def _qa_confidence(evidence: list[dict], citations: list[KnowledgeNode]) -> str:
+    hybrid_scores = [float(item["final_score"]) for item in evidence if item.get("final_score") is not None]
+    if hybrid_scores:
+        strongest = max(hybrid_scores)
+        if strongest >= 0.72 and (citations or len(hybrid_scores) >= 2):
+            return "high"
+        if strongest >= 0.42:
+            return "medium"
+        return "low"
     document_scores = [
         float(item["bm25_score"]) for item in evidence
         if item.get("type") == "document" and item.get("bm25_score") is not None

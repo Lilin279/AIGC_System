@@ -13,6 +13,7 @@ os.environ["COURSEGRAPH_DATA_DIR"] = str(Path(TEST_DATA.name) / "data")
 # API 回归必须保持离线，避免开发者本机配置 Key 后测试误调用真实服务。
 os.environ["DEEPSEEK_API_KEY"] = ""
 os.environ["NEO4J_HTTP_URL"] = ""
+os.environ["HYBRID_RAG_ENABLED"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -351,6 +352,34 @@ class ApiTestCase(unittest.TestCase):
             json={"question": "zxqv nebula horticulture checksum 94817"},
         ).json()
         self.assertIn("没有足够证据", unknown["answer"])
+
+    def test_hybrid_graphrag_exposes_component_scores_and_mode(self) -> None:
+        teacher = self.login("teacher", "Teacher123!")
+        vector_hit = {
+            "id": "vector_chunk",
+            "source": "python_intro.md",
+            "excerpt": "变量用于保存程序运行中的数据。",
+            "type": "document",
+            "document_id": "doc_python",
+            "vector_score": 0.91,
+            "source_score": 0.8,
+            "vector_backend": "qdrant",
+        }
+        with (
+            patch.dict(os.environ, {"HYBRID_RAG_ENABLED": "true", "HYBRID_RAG_RERANK_ENABLED": "false"}),
+            patch("app.services.hybrid_retrieval.semantic_candidates", return_value=([vector_hit], "hybrid")),
+        ):
+            response = self.client.post(
+                "/api/courses/python_intro/qa",
+                headers=self.headers(teacher),
+                json={"question": "变量有什么作用"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertIn("+hybrid", result["mode"])
+        self.assertTrue(result["evidence"])
+        self.assertTrue(all("scores" in item and "final_score" in item for item in result["evidence"]))
 
     def test_student_learning_outputs_report_generation_mode(self) -> None:
         student = self.login("student", "Student123!")

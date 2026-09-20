@@ -313,6 +313,17 @@ CREATE TABLE IF NOT EXISTS neo4j_sync_state (
     synced_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS vector_index_state (
+    course_id TEXT PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    model TEXT NOT NULL DEFAULT '',
+    fingerprint TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'synced', 'failed')),
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    message TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    synced_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_classrooms_course ON classrooms(course_id, status);
 CREATE INDEX IF NOT EXISTS idx_class_teachers_teacher ON class_teachers(teacher_id, classroom_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id, status);
@@ -324,6 +335,7 @@ CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status, updated_at DESC
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_neo4j_sync_status ON neo4j_sync_state(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_vector_index_status ON vector_index_state(status, updated_at);
 """
 
 
@@ -393,6 +405,7 @@ def initialize_schema() -> None:
             pass
         connection.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (4)")
         connection.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (5)")
+        connection.execute("INSERT OR IGNORE INTO schema_migrations(version) VALUES (6)")
         connection.execute("PRAGMA optimize")
 
 

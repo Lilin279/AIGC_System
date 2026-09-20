@@ -123,6 +123,15 @@ export interface Neo4jStatus {
 export interface IntegrationStatus {
   aigc: { mode: string };
   neo4j: Neo4jStatus;
+  hybrid_rag: {
+    enabled: boolean;
+    available: boolean;
+    embedding_model: string;
+    reranker_model: string;
+    vector_store: string;
+    message: string;
+    indexes: { synced: number; pending: number; failed: number };
+  };
 }
 
 export interface KnowledgeGraph { nodes: KnowledgeNode[]; edges: KnowledgeEdge[] }
@@ -176,6 +185,12 @@ export interface Evidence {
   document_id?: string;
   page_no?: number;
   bm25_score?: number;
+  vector_score?: number;
+  hybrid_score?: number;
+  reranker_score?: number;
+  final_score?: number;
+  retrieval_mode?: string;
+  scores?: { bm25: number; vector: number; graph: number; source: number };
   rank?: number;
 }
 

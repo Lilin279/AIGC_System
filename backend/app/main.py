@@ -34,7 +34,7 @@ T = TypeVar("T")
 app = FastAPI(
     title="AIGC 课程知识图谱学习导航系统",
     description="面向学校的课程、教学班、可溯源图谱与个性化学习平台。",
-    version="0.5.0",
+    version="0.6.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -52,6 +52,12 @@ def startup() -> None:
     from app.services.neo4j_adapter import configured as neo4j_configured, retry_pending_syncs
     if neo4j_configured():
         Thread(target=retry_pending_syncs, name="neo4j-sync-retry", daemon=True).start()
+
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    from app.services.hybrid_retrieval import close_runtime
+    close_runtime()
 
 
 def current_user(
@@ -510,7 +516,12 @@ def avatar_file(filename: str, user: Annotated[User, Depends(current_user)]) -> 
 @app.get("/api/integrations")
 def integrations(user: Annotated[User, Depends(operational_user)]) -> dict:
     from app.services.neo4j_adapter import status as neo4j_status
-    return {"aigc": {"mode": deepseek.extraction_mode()}, "neo4j": neo4j_status()}
+    from app.services.hybrid_retrieval import status as hybrid_retrieval_status
+    return {
+        "aigc": {"mode": deepseek.extraction_mode()},
+        "neo4j": neo4j_status(),
+        "hybrid_rag": hybrid_retrieval_status(),
+    }
 
 
 @app.post("/api/courses/{course_id}/graph/sync")

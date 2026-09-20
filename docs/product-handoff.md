@@ -6,8 +6,8 @@
 |---|---|
 | 产品名称 | CourseGraph AI 课程知识图谱教学平台 |
 | 当前阶段 | 学校客户演示版 / 竞赛功能版 |
-| 后端版本 | `0.5.0` |
-| 交接日期 | 2026-09-06 |
+| 后端版本 | `0.6.0` |
+| 交接日期 | 2026-09-20 |
 | Git 分支 | `dev` |
 | 已推送功能基线 | `cda709a feat: 完成客户化系统与真实 AI GraphRAG` |
 | 当前本地增量 | UI 风格迭代与 Neo4j 正式查询链路，尚未提交 |
@@ -127,9 +127,12 @@ Enrollment 学习关系
 - SQLite FTS5 全文索引。
 - 中文 2-gram / 3-gram 检索词生成。
 - BM25 课件片段排序。
-- 知识点匹配和图谱邻居扩展。
+- `BAAI/bge-small-zh-v1.5` 中文 Embedding 与 Qdrant 向量检索。
+- 知识点匹配和 Neo4j 一至两跳图谱邻居扩展。
+- BM25、向量、图谱和来源可信度统一评分，使用 `BAAI/bge-reranker-base` Cross-Encoder 重排序。
 - DeepSeek 仅基于检索证据回答。
-- 返回课件名称、页码、引用片段、知识点和置信提示。
+- 返回课件名称、页码、引用片段、知识点、各通道分数和置信提示。
+- 向量库或模型异常时自动降级到 BM25 与图谱检索。
 - 证据不足时拒答；未配置 AI 时明确标记离线模式。
 
 ### 5.6 客户服务与审计
@@ -148,7 +151,7 @@ Enrollment 学习关系
 | 图谱展示 | AntV G6 5.x |
 | 后端 | FastAPI、Pydantic、Uvicorn |
 | 主数据库 | SQLite |
-| 检索 | SQLite FTS5、BM25、中文 N-gram |
+| 检索 | SQLite FTS5、BM25、中文 N-gram、BGE Embedding、Qdrant、BGE Cross-Encoder |
 | 大模型 | DeepSeek OpenAI 兼容接口，默认 `deepseek-v4-flash` |
 | 文档解析 | pypdf、OOXML 解析；OCR 可选 PyMuPDF + RapidOCR |
 | 图数据库 | Neo4j Community/AuraDB；正式图谱同步、一致性校验、学习路径与 GraphRAG 图查询 |
@@ -184,6 +187,7 @@ Neo4j 已从“可选同步副本”升级为正式图查询通道：
 | `backend/app/services/deepseek.py` | DeepSeek 抽取、问答、诊断和练习 |
 | `backend/app/services/parser.py` | 多格式课件解析与 OCR 入口 |
 | `backend/app/services/neo4j_adapter.py` | Neo4j 可选同步适配器 |
+| `backend/app/services/hybrid_retrieval.py` | 中文向量索引、四通道评分与 Cross-Encoder 重排序 |
 | `backend/data/coursegraph.db` | 默认本地 SQLite 数据库 |
 | `backend/data/uploads/` | 课件、头像和工单附件 |
 | `backend/tests/` | 后端自动化测试 |
@@ -262,7 +266,7 @@ npm.cmd run dev
 - 班级可见性与学习进度隔离。
 - CSV 导入和首次强制改密。
 - 课件上传、候选版本、删除和选择性回滚。
-- 中文 BM25、课程证据隔离和证据不足拒答。
+- 中文 BM25、Qdrant 向量召回、融合评分、课程证据隔离和证据不足拒答。
 - DeepSeek 正常 JSON、非法 JSON、空响应、截断、429、5xx 和超时。
 - AI 诊断、学习路径和练习模式标记。
 
@@ -295,7 +299,8 @@ npm.cmd run dev
 
 ### 11.3 AI 与 RAG
 
-- 当前没有向量 Embedding 和 Reranker，语义表达差异较大的问题可能召回不足。
+- 混合 GraphRAG 默认关闭，启用时首次下载约 90 MB Embedding 模型和约 1 GB Reranker；2 核 2 GB 环境需实测内存与时延后再决定是否常驻。
+- 当前融合权重为人工初值，仍需通过 24 题及扩展数据集完成权重调优和消融实验。
 - 知识融合主要依据规范化名称，尚未完成完整同义词库和实体消歧。
 - 大模型可能输出结构正确但语义错误的关系，仍依赖教师审核。
 - AI 调用有用量日志，但缺少学校级预算、额度预警和模型熔断管理。
@@ -382,9 +387,10 @@ npm.cmd run dev
 ### P2：竞赛创新和效果提升
 
 1. **混合 GraphRAG**
-   - 在 BM25 基础上增加中文 Embedding、向量检索和 Reranker。
-   - 将 Neo4j 多跳邻居作为独立召回通道。
-   - 验收：24 题及扩展测试集的引用正确率、拒答率和召回率均有量化提升。
+   - 已完成：BGE 中文 Embedding、Qdrant 本地/服务端向量库、Neo4j 一至两跳召回、四通道融合评分和 BGE Cross-Encoder 重排序。
+   - 已完成：模型或向量库异常时自动降级，接口返回通道分数和实际检索模式。
+   - 已完成：24 题问答、20 题检索消融、8 组推荐路径和本机接口并发测试，结果见 `docs/15_evaluation_report.md`。
+   - 待完成：独立专家金标准、Cross-Encoder 实模型消融、引用正确率人工复核、Token 成本和真实教学效果对照实验。
 
 2. **知识融合与消歧**
    - 建立课程同义词表、实体别名、章节上下文和冲突合并界面。
@@ -423,7 +429,7 @@ npm.cmd run dev
 - 不少于 20 个问题的问答测试和课程外问题拒答案例。
 - 最终项目说明书、PPT、3–5 分钟演示视频和答辩脚本。
 
-测试和材料中可说明 Neo4j 查询代码与自动化回归已经完成，但在真实服务验收截图完成前，不得宣称部署联调已通过；向量检索和未执行的准确率测试也不得写成已完成结果。
+测试和材料中可说明 Neo4j 查询、中文 Embedding、Qdrant 语义召回、融合评分与降级回归已经完成。Cross-Encoder 完整模型、线上资源占用和未执行的准确率测试不得写成已完成验收结果。
 
 ## 14. 交接后的开发规则
 

@@ -1,0 +1,113 @@
+{
+  "mode": "deepseek",
+  "reference_type": "项目示例图谱银标；非独立双人标注，因此只用于工程回归，不能替代正式论文实验",
+  "courses": 2,
+  "entity": {
+    "true_positive": 31,
+    "predicted": 41,
+    "expected": 40,
+    "precision": 0.7561,
+    "recall": 0.775,
+    "f1": 0.7654
+  },
+  "relation": {
+    "true_positive": 12,
+    "predicted": 43,
+    "expected": 40,
+    "precision": 0.2791,
+    "recall": 0.3,
+    "f1": 0.2892
+  },
+  "mean_latency_ms": 8538,
+  "details": [
+    {
+      "course_id": "python_intro",
+      "latency_ms": 8972,
+      "entity": {
+        "true_positive": 16,
+        "predicted": 20,
+        "expected": 20,
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8
+      },
+      "relation": {
+        "true_positive": 8,
+        "predicted": 23,
+        "expected": 20,
+        "precision": 0.3478,
+        "recall": 0.4,
+        "f1": 0.3721
+      },
+      "source_traceability": 1.0,
+      "warnings": [],
+      "predicted_node_names": [
+        "程序设计",
+        "Python解释器",
+        "变量",
+        "数据类型",
+        "表达式",
+        "流程控制",
+        "错误信息",
+        "列表",
+        "字典",
+        "字符串处理",
+        "函数",
+        "参数传递",
+        "模块化",
+        "文件读写",
+        "异常处理",
+        "模块",
+        "单元测试",
+        "面向对象",
+        "类",
+        "对象"
+      ]
+    },
+    {
+      "course_id": "database_systems",
+      "latency_ms": 8103,
+      "entity": {
+        "true_positive": 15,
+        "predicted": 21,
+        "expected": 20,
+        "precision": 0.7143,
+        "recall": 0.75,
+        "f1": 0.7317
+      },
+      "relation": {
+        "true_positive": 4,
+        "predicted": 20,
+        "expected": 20,
+        "precision": 0.2,
+        "recall": 0.2,
+        "f1": 0.2
+      },
+      "source_traceability": 1.0,
+      "warnings": [],
+      "predicted_node_names": [
+        "数据库系统",
+        "数据模型",
+        "关系模型",
+        "表",
+        "主键",
+        "外键",
+        "SQL查询",
+        "范式",
+        "函数依赖",
+        "事务",
+        "ACID特性",
+        "并发控制",
+        "锁机制",
+        "日志恢复",
+        "索引",
+        "B+树",
+        "查询优化器",
+        "执行计划",
+        "视图",
+        "权限",
+        "备份恢复"
+      ]
+    }
+  ]
+}

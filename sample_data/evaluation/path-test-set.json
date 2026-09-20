@@ -1,0 +1,50 @@
+[
+  {
+    "case_id": "PATH001",
+    "course_id": "python_intro",
+    "mastered_node_ids": [],
+    "expected_next_node_ids": ["py_02"]
+  },
+  {
+    "case_id": "PATH002",
+    "course_id": "python_intro",
+    "mastered_node_ids": ["py_02"],
+    "expected_next_node_ids": ["py_03"]
+  },
+  {
+    "case_id": "PATH003",
+    "course_id": "python_intro",
+    "mastered_node_ids": ["py_02", "py_03"],
+    "expected_next_node_ids": ["py_04"]
+  },
+  {
+    "case_id": "PATH004",
+    "course_id": "python_intro",
+    "mastered_node_ids": ["py_02", "py_03", "py_04", "py_05"],
+    "expected_next_node_ids": ["py_07"]
+  },
+  {
+    "case_id": "PATH005",
+    "course_id": "database_systems",
+    "mastered_node_ids": [],
+    "expected_next_node_ids": ["db_01"]
+  },
+  {
+    "case_id": "PATH006",
+    "course_id": "database_systems",
+    "mastered_node_ids": ["db_01"],
+    "expected_next_node_ids": ["db_02"]
+  },
+  {
+    "case_id": "PATH007",
+    "course_id": "database_systems",
+    "mastered_node_ids": ["db_01", "db_02", "db_03"],
+    "expected_next_node_ids": ["db_04"]
+  },
+  {
+    "case_id": "PATH008",
+    "course_id": "database_systems",
+    "mastered_node_ids": ["db_12"],
+    "expected_next_node_ids": ["db_14"]
+  }
+]
