@@ -635,18 +635,22 @@ def retrieve_evidence(course_id: str, query: str, user: User, limit: int = 5) ->
     return ranked.evidence, ranked_citations
 
 
-def graphrag_answer(course_id: str, question: str, user: User) -> QAResult:
+def qa_context(
+    course_id: str, question: str, user: User,
+) -> tuple[list[dict], list[KnowledgeNode], str, str]:
     evidence, citations = retrieve_evidence(course_id, question, user)
-    answer = deepseek.answer_with_evidence(question, evidence)
     confidence = _qa_confidence(evidence, citations)
     graph_backend = "+neo4j" if any(item.get("backend") == "neo4j" for item in evidence) else ""
     retrieval_mode = next((item.get("retrieval_mode") for item in evidence if item.get("retrieval_mode")), "")
     hybrid_mode = f"+{retrieval_mode}" if retrieval_mode else ""
-    return QAResult(
-        answer=answer, citations=citations, confidence=confidence,
-        evidence=evidence,
-        mode=("deepseek-graphrag" if deepseek.configured() else "offline-graphrag") + graph_backend + hybrid_mode,
-    )
+    mode = ("deepseek-graphrag" if deepseek.configured() else "offline-graphrag") + graph_backend + hybrid_mode
+    return evidence, citations, confidence, mode
+
+
+def graphrag_answer(course_id: str, question: str, user: User) -> QAResult:
+    evidence, citations, confidence, mode = qa_context(course_id, question, user)
+    answer = deepseek.answer_with_evidence(question, evidence)
+    return QAResult(answer=answer, citations=citations, confidence=confidence, evidence=evidence, mode=mode)
 
 
 def _qa_confidence(evidence: list[dict], citations: list[KnowledgeNode]) -> str:

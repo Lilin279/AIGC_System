@@ -409,3 +409,29 @@ class ExerciseResult(BaseModel):
     difficulty: str = "基础"
     sources: list[dict[str, Any]] = Field(default_factory=list)
     mode: str = "offline-rule"
+
+
+class TestQuestion(BaseModel):
+    question: str
+    question_type: str = "基础题"
+    difficulty: str = "基础"
+    options: list[str] = Field(default_factory=list)
+    answer_index: int = -1
+    explanation: str = ""
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TestResult(BaseModel):
+    test_id: str = ""
+    node_id: str
+    node_name: str
+    questions: list[TestQuestion] = Field(default_factory=list)
+    total: int = 0
+    correct: int = 0
+    passed: bool = False
+    mode: str = "offline-rule"
+    results: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TestSubmitRequest(BaseModel):
+    answers: list[int] = Field(default_factory=list)

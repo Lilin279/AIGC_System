@@ -232,6 +232,30 @@ export interface ExerciseGenerateRequest {
   count: number;
 }
 
+export interface TestQuestion {
+  question: string;
+  question_type: string;
+  difficulty: string;
+  options: string[];
+  answer_index: number;
+  explanation: string;
+  sources: Evidence[];
+}
+
+export interface TestResult {
+  test_id: string;
+  node_id: string;
+  node_name: string;
+  questions: TestQuestion[];
+  total: number;
+  correct: number;
+  passed: boolean;
+  mode: string;
+  results: Array<{ chosen: number; answer_index: number; correct: boolean; explanation: string }>;
+}
+
+export interface TestSubmitRequest { answers: number[] }
+
 export interface TicketMessage { id: string; content: string; created_at: string; author_id: string; author_name: string; author_role: string }
 export interface Ticket {
   id: string;

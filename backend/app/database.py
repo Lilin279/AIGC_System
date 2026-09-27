@@ -324,6 +324,19 @@ CREATE TABLE IF NOT EXISTS vector_index_state (
     synced_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS node_test_attempts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    classroom_id TEXT NOT NULL REFERENCES classrooms(id) ON DELETE CASCADE,
+    node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'started' CHECK (status IN ('started', 'finished')),
+    total INTEGER NOT NULL DEFAULT 0,
+    correct INTEGER NOT NULL DEFAULT 0,
+    passed INTEGER NOT NULL DEFAULT 0,
+    questions_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_classrooms_course ON classrooms(course_id, status);
 CREATE INDEX IF NOT EXISTS idx_class_teachers_teacher ON class_teachers(teacher_id, classroom_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id, status);
@@ -336,6 +349,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_neo4j_sync_status ON neo4j_sync_state(status, updated_at);
 CREATE INDEX IF NOT EXISTS idx_vector_index_status ON vector_index_state(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_test_attempts_user ON node_test_attempts(user_id, classroom_id, node_id);
 """
 
 

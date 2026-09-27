@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from threading import Thread
 from typing import Annotated, TypeVar
@@ -7,7 +8,7 @@ from typing import Annotated, TypeVar
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app import graph_lifecycle, platform, storage
 from app.auth import issue_session, revoke_session, user_from_token
@@ -18,8 +19,8 @@ from app.models import (
     ImportCommitResult, ImportPreview, JoinClassRequest, KnowledgeEdge, KnowledgeEdgeCreate,
     KnowledgeEdgeUpdate, KnowledgeGraph, KnowledgeNode, KnowledgeNodeCreate, LearningPathRequest,
     LearningPathResult, LoginRequest, LoginResult, PasswordUpdate, ProfileUpdate, ProgressUpdate,
-    QARequest, QAResult, RegisterRequest, TeacherRegisterRequest, TeacherReview, Ticket,
-    TicketCreate, TicketReplyCreate, TicketUpdate, User,
+    QARequest, QAResult, RegisterRequest, TeacherRegisterRequest, TeacherReview, TestResult,
+    TestSubmitRequest, Ticket, TicketCreate, TicketReplyCreate, TicketUpdate, User,
 )
 from app.services import deepseek
 from app.services.parser import parse_text_file
@@ -439,6 +440,41 @@ def class_qa(classroom_id: str, payload: QARequest, user: Annotated[User, Depend
     return execute(lambda: graph_lifecycle.graphrag_answer(classroom.course_id, payload.question, user))
 
 
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.post("/api/classrooms/{classroom_id}/qa/stream")
+def class_qa_stream(
+    classroom_id: str, payload: QARequest, user: Annotated[User, Depends(operational_user)],
+) -> StreamingResponse:
+    classroom = execute(lambda: platform.get_classroom(classroom_id, user))
+    course_id = classroom.course_id
+
+    def generate():
+        try:
+            evidence, citations, confidence, mode = graph_lifecycle.qa_context(course_id, payload.question, user)
+            yield _sse("start", {"mode": mode})
+            parts: list[str] = []
+            for chunk in deepseek.answer_with_evidence_stream(payload.question, evidence):
+                parts.append(chunk)
+                yield _sse("delta", {"text": chunk})
+            yield _sse("done", {
+                "answer": "".join(parts),
+                "citations": [citation.model_dump() for citation in citations],
+                "evidence": evidence,
+                "confidence": confidence,
+                "mode": mode,
+            })
+        except Exception as exc:
+            yield _sse("error", {"message": str(exc) or "生成回答失败"})
+
+    return StreamingResponse(
+        generate(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.get("/api/classrooms/{classroom_id}/diagnosis", response_model=DiagnosisResult)
 def class_diagnosis(classroom_id: str, user: Annotated[User, Depends(operational_user)]) -> DiagnosisResult:
     return execute(lambda: platform.diagnosis(classroom_id, user))
@@ -451,6 +487,21 @@ def class_exercises(
     payload: ExerciseGenerateRequest | None = None,
 ) -> list[ExerciseResult]:
     return execute(lambda: platform.generate_exercises(classroom_id, user, payload or ExerciseGenerateRequest()))
+
+
+@app.post("/api/classrooms/{classroom_id}/nodes/{node_id}/test", response_model=TestResult)
+def node_test(
+    classroom_id: str, node_id: str, user: Annotated[User, Depends(operational_user)],
+) -> TestResult:
+    return execute(lambda: platform.generate_node_test(classroom_id, node_id, user))
+
+
+@app.post("/api/classrooms/{classroom_id}/nodes/{node_id}/test/{test_id}/submit", response_model=TestResult)
+def node_test_submit(
+    classroom_id: str, node_id: str, test_id: str, payload: TestSubmitRequest,
+    user: Annotated[User, Depends(operational_user)],
+) -> TestResult:
+    return execute(lambda: platform.submit_node_test(classroom_id, node_id, test_id, payload.answers, user))
 
 
 # Feedback tickets

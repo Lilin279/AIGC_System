@@ -28,6 +28,8 @@ from app.models import (
     ProfileUpdate,
     TeacherRegisterRequest,
     TeacherReview,
+    TestQuestion,
+    TestResult,
     Ticket,
     TicketCreate,
     TicketReplyCreate,
@@ -798,6 +800,17 @@ def set_class_progress(classroom_id: str, node_id: str, mastered: bool, user: Us
         node = connection.execute("SELECT * FROM nodes WHERE id = ? AND course_id = ?", (node_id, classroom.course_id)).fetchone()
         if not node:
             raise KeyError("知识点不存在")
+        if mastered:
+            passed_test = connection.execute(
+                """
+                SELECT 1 FROM node_test_attempts
+                WHERE user_id = ? AND classroom_id = ? AND node_id = ? AND passed = 1
+                LIMIT 1
+                """,
+                (user.id, classroom_id, node_id),
+            ).fetchone()
+            if not passed_test:
+                raise ValueError("请先通过该知识点的测试，再标记为已掌握")
         connection.execute(
             """
             INSERT INTO class_learning_progress(user_id, classroom_id, node_id, mastered, updated_at)
@@ -810,6 +823,111 @@ def set_class_progress(classroom_id: str, node_id: str, mastered: bool, user: Us
     return KnowledgeNode(
         id=node["id"], name=node["name"], type=node["type"], definition=node["definition"],
         example=node["example"], resources=json.loads(node["resources_json"] or "[]"), mastered=mastered,
+    )
+
+
+def generate_node_test(classroom_id: str, node_id: str, user: User) -> TestResult:
+    from app import graph_lifecycle
+    from app.services import deepseek
+
+    if user.role != "student":
+        raise PermissionError("仅学生可以参加掌握测试")
+    classroom = get_classroom(classroom_id, user)
+    with connect() as connection:
+        node_row = connection.execute(
+            "SELECT * FROM nodes WHERE id = ? AND course_id = ?", (node_id, classroom.course_id)
+        ).fetchone()
+        if not node_row:
+            raise KeyError("知识点不存在")
+        node = KnowledgeNode(
+            id=node_row["id"], name=node_row["name"], type=node_row["type"],
+            definition=node_row["definition"], example=node_row["example"],
+            resources=json.loads(node_row["resources_json"] or "[]"),
+        )
+    graph = get_class_graph(classroom_id, user)
+    query = f"知识点：{node.name} {node.definition} {node.example}"
+    evidence, _ = graph_lifecycle.retrieve_evidence(classroom.course_id, query, user) if query else ([], [])
+    try:
+        questions = deepseek.test_questions(classroom.course_name, node, graph.nodes, evidence, 5)
+        mode = "deepseek-evidence" if deepseek.configured() else "offline-rule"
+    except ValueError:
+        questions = deepseek.offline_test_questions(node, graph.nodes, 5)
+        mode = "offline-fallback"
+    test_id = f"test_{uuid.uuid4().hex[:12]}"
+    with connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO node_test_attempts(id, user_id, classroom_id, node_id, status, total, correct, passed, questions_json)
+            VALUES (?, ?, ?, ?, 'started', ?, 0, 0, ?)
+            """,
+            (
+                test_id, user.id, classroom_id, node_id, len(questions),
+                json.dumps([question.model_dump() for question in questions], ensure_ascii=False),
+            ),
+        )
+    return TestResult(
+        test_id=test_id, node_id=node.id, node_name=node.name,
+        questions=[question.model_copy(update={"answer_index": -1}) for question in questions],
+        total=len(questions), mode=mode,
+    )
+
+
+def submit_node_test(
+    classroom_id: str, node_id: str, test_id: str, answers: list[int], user: User,
+) -> TestResult:
+    if user.role != "student":
+        raise PermissionError("仅学生可以提交掌握测试")
+    classroom = get_classroom(classroom_id, user)
+    with connect() as connection:
+        row = connection.execute(
+            """
+            SELECT * FROM node_test_attempts
+            WHERE id = ? AND user_id = ? AND classroom_id = ? AND node_id = ? AND status = 'started'
+            """,
+            (test_id, user.id, classroom_id, node_id),
+        ).fetchone()
+        if not row:
+            raise KeyError("测试不存在或已提交")
+        node_row = connection.execute(
+            "SELECT name FROM nodes WHERE id = ? AND course_id = ?", (node_id, classroom.course_id)
+        ).fetchone()
+        if not node_row:
+            raise KeyError("知识点不存在")
+        questions = [TestQuestion(**item) for item in json.loads(row["questions_json"] or "[]")]
+        total = len(questions)
+        correct = sum(
+            1 for index, question in enumerate(questions)
+            if index < len(answers) and answers[index] == question.answer_index
+        )
+        passed = total > 0 and len(answers) >= total and correct == total
+        results: list[dict] = []
+        for index, question in enumerate(questions):
+            chosen = answers[index] if index < len(answers) else -1
+            results.append({
+                "chosen": chosen,
+                "answer_index": question.answer_index,
+                "correct": chosen == question.answer_index,
+                "explanation": question.explanation,
+            })
+        connection.execute(
+            """
+            UPDATE node_test_attempts SET status = 'finished', correct = ?, passed = ? WHERE id = ?
+            """,
+            (correct, int(passed), test_id),
+        )
+        if passed:
+            connection.execute(
+                """
+                INSERT INTO class_learning_progress(user_id, classroom_id, node_id, mastered, updated_at)
+                VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, classroom_id, node_id)
+                DO UPDATE SET mastered = 1, updated_at = CURRENT_TIMESTAMP
+                """,
+                (user.id, classroom_id, node_id),
+            )
+    return TestResult(
+        test_id=test_id, node_id=node_id, node_name=node_row["name"], questions=questions,
+        total=total, correct=correct, passed=passed, mode="graded", results=results,
     )
 
 

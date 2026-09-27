@@ -5,13 +5,13 @@ import {
   Network, Plus, RefreshCw, Route, Save, School, Search, Send, Settings, ShieldCheck,
   Trash2, Upload, UserCheck, Users, X,
 } from 'lucide-react';
-import { api, hasAccessToken, setAccessToken } from './api';
+import { api, hasAccessToken, setAccessToken, streamClassQa } from './api';
 import GraphView from './components/GraphView';
 import type {
   AIStatus, Classroom, Course, DashboardStats, DiagnosisResult, DocumentImpact, DocumentInfo,
   ExerciseQuestionType, ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
   KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, RelationType,
-  Ticket, User,
+  TestResult, Ticket, User,
 } from './types';
 
 const emptyGraph: KnowledgeGraph = { nodes: [], edges: [] };
@@ -246,6 +246,8 @@ function StudentLearning({ run }: RunProps) {
   const [exerciseTypes, setExerciseTypes] = useState<ExerciseQuestionType[]>(exerciseTypeOptions);
   const [exerciseCount, setExerciseCount] = useState(3);
   const [exerciseLoading, setExerciseLoading] = useState(false);
+  const [qaLoading, setQaLoading] = useState(false);
+  const [testModal, setTestModal] = useState<{ node: KnowledgeNode; stage: 'loading' | 'taking' | 'result'; test?: TestResult; answers: number[] }>();
 
   const loadClasses = useCallback(async () => {
     const data = await api.listClassrooms();
@@ -294,10 +296,52 @@ function StudentLearning({ run }: RunProps) {
   };
 
   const askQuestion = () => {
+    if (qaLoading) return;
     const contextualQuestion = selected
       ? '当前知识点：' + selected.name + '\n学生问题：' + question
       : question;
-    void run(async () => setAnswer(await api.classQa(classId, contextualQuestion)), '已基于课程图谱和 AI 通用知识生成回答。');
+    setQaLoading(true);
+    setAnswer(undefined);
+    void run(async () => {
+      try {
+        await streamClassQa(classId, contextualQuestion, {
+          onDelta: (text) => setAnswer((old) => ({
+            answer: (old?.answer ?? '') + text, citations: old?.citations ?? [],
+            confidence: old?.confidence ?? '', evidence: old?.evidence ?? [], mode: old?.mode ?? '',
+          })),
+          onDone: (payload) => setAnswer({
+            answer: payload.answer, citations: payload.citations, evidence: payload.evidence,
+            confidence: payload.confidence, mode: payload.mode,
+          }),
+        });
+      } catch {
+        setAnswer(await api.classQa(classId, contextualQuestion));
+      }
+    }).finally(() => setQaLoading(false));
+  };
+
+  const beginTest = (node: KnowledgeNode) => {
+    setTestModal({ node, stage: 'loading', answers: [] });
+    void run(async () => {
+      let opened = false;
+      try {
+        const test = await api.nodeTest(classId, node.id);
+        opened = true;
+        setTestModal({ node, stage: 'taking', test, answers: test.questions.map(() => -1) });
+      } finally {
+        if (!opened) setTestModal(undefined);
+      }
+    });
+  };
+
+  const submitTest = () => {
+    const modal = testModal;
+    if (!modal?.test) return;
+    void run(async () => {
+      const result = await api.submitNodeTest(classId, modal.node.id, modal.test!.test_id, modal.answers);
+      setTestModal({ ...modal, stage: 'result', test: result });
+      await loadGraph(classId);
+    });
   };
 
   return <>
@@ -331,7 +375,7 @@ function StudentLearning({ run }: RunProps) {
               <h2>{selected.name}</h2>
               <p>{selected.definition}</p>
               <small>{selected.example}</small>
-              <button className={selected.mastered ? 'secondary wide' : 'primary wide'} onClick={() => run(async () => { await api.classProgress(classId, selected.id, !selected.mastered); await loadGraph(classId); }, selected.mastered ? '已取消掌握标记。' : '学习进度已更新。')}>{selected.mastered ? '取消掌握' : '标记为已掌握'}</button>
+              <button className={selected.mastered ? 'secondary wide' : 'primary wide'} onClick={() => selected.mastered ? run(async () => { await api.classProgress(classId, selected.id, false); await loadGraph(classId); }, '已取消掌握标记。') : beginTest(selected)}>{selected.mastered ? '取消掌握' : '标记为已掌握（需通过测试）'}</button>
             </> : <p>点击图谱节点查看内容。</p>}
           </section>
 
@@ -360,10 +404,11 @@ function StudentLearning({ run }: RunProps) {
           <section className="surface">
             <h3><Bot size={17} />可溯源问答</h3>
             <textarea value={question} onChange={(event) => setQuestion(event.target.value)} />
-            <button className="primary" onClick={askQuestion}><Send size={15} />提问</button>
+            <button className="primary" disabled={qaLoading} onClick={askQuestion}><Send size={15} />{qaLoading ? '思考中…' : '提问'}</button>
+            {qaLoading && !answer && <div className="qa-thinking"><span className="spinner" />正在思考…</div>}
             {answer && <div className="answer">
               <p>{answer.answer}</p>
-              <div className="answer-meta"><span>{answer.mode}</span><span>置信度 {answer.confidence}</span></div>
+              {answer.mode && <div className="answer-meta"><span>{answer.mode}</span><span>置信度 {answer.confidence}</span></div>}
               {answer.evidence.map((item, index) => <details key={(item.source || 'evidence') + index}><summary>[{index + 1}] {item.source}</summary><small>{item.excerpt}</small>{item.scores && <span className="evidence-score">融合 {item.final_score?.toFixed(3)} · BM25 {item.scores.bm25.toFixed(2)} · 向量 {item.scores.vector.toFixed(2)} · 图谱 {item.scores.graph.toFixed(2)} · 来源 {item.scores.source.toFixed(2)}{item.reranker_score !== undefined ? ` · 重排 ${item.reranker_score.toFixed(2)}` : ''}</span>}</details>)}
             </div>}
           </section>
@@ -407,6 +452,65 @@ function StudentLearning({ run }: RunProps) {
           <div className="modal-actions">
             <button className="secondary" onClick={() => setExerciseStage('config')}>重新设置</button>
             <button className="primary" onClick={() => setExerciseModal(false)}>完成</button>
+          </div>
+        </>}
+      </section>
+    </div>}
+
+    {testModal && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="掌握测试">
+      <section className="modal test-modal">
+        <div className="modal-title">
+          <div><h3>{testModal.stage === 'result' ? '测试结果' : '掌握测试'}</h3><p>{testModal.node.name} · {classroom?.course_name}</p></div>
+          <button title="关闭测试" aria-label="关闭测试" onClick={() => setTestModal(undefined)}><X size={18} /></button>
+        </div>
+
+        {testModal.stage === 'loading' && <div className="test-loading"><span className="spinner" />正在生成测试题…</div>}
+
+        {testModal.stage === 'taking' && testModal.test && <>
+          <div className="test-progress">已作答 {testModal.answers.filter((value) => value >= 0).length}/{testModal.test.questions.length} · 全部答对方可通过</div>
+          <div className="test-questions">
+            {testModal.test.questions.map((item, index) => (
+              <div className="test-question" key={index}>
+                <p><b>{index + 1}. </b>{item.question}<span className="node-type">{item.question_type} · {item.difficulty}</span></p>
+                {item.options.map((option, optionIndex) => (
+                  <label className={'test-option ' + (testModal.answers[index] === optionIndex ? 'selected' : '')} key={optionIndex}>
+                    <input type="radio" name={`test-${testModal.test!.test_id}-${index}`} checked={testModal.answers[index] === optionIndex} onChange={() => setTestModal({ ...testModal, answers: testModal.answers.map((value, i) => i === index ? optionIndex : value) })} />
+                    <span>{String.fromCharCode(65 + optionIndex)}. {option}</span>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button className="secondary" onClick={() => setTestModal(undefined)}>取消</button>
+            <button className="primary" disabled={testModal.answers.some((value) => value < 0)} onClick={submitTest}><Check size={16} />提交测试</button>
+          </div>
+        </>}
+
+        {testModal.stage === 'result' && testModal.test && <>
+          <div className={'test-result ' + (testModal.test.passed ? 'passed' : 'failed')}>
+            <b>{testModal.test.passed ? '恭喜，测试通过！' : '未通过测试'}</b>
+            <span>答对 {testModal.test.correct}/{testModal.test.total} 题</span>
+            <p>{testModal.test.passed ? '该知识点已标记为已掌握。' : '全部答对才能标记为已掌握，请复习后重试。'}</p>
+          </div>
+          <div className="test-questions">
+            {testModal.test.questions.map((item, index) => {
+              const detail = testModal.test?.results[index];
+              return <div className="test-question" key={index}>
+                <p><b>{index + 1}. </b>{item.question}</p>
+                {item.options.map((option, optionIndex) => (
+                  <div className={'test-option static ' + (optionIndex === detail?.answer_index ? 'correct' : optionIndex === detail?.chosen && detail?.chosen !== detail?.answer_index ? 'wrong' : '')} key={optionIndex}>
+                    <span>{String.fromCharCode(65 + optionIndex)}. {option}</span>
+                    {optionIndex === detail?.answer_index && <Check size={15} />}
+                  </div>
+                ))}
+                <small className="test-explain">{detail?.explanation || item.explanation}</small>
+              </div>;
+            })}
+          </div>
+          <div className="modal-actions">
+            <button className="secondary" onClick={() => setTestModal(undefined)}>关闭</button>
+            {!testModal.test.passed && <button className="primary" onClick={() => beginTest(testModal.node)}><RefreshCw size={16} />重新测试</button>}
           </div>
         </>}
       </section>

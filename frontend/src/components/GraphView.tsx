@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Graph as G6Graph } from '@antv/g6';
+import { Search, X } from 'lucide-react';
 import type { KnowledgeGraph, KnowledgeNode } from '../types';
 
 interface GraphViewProps {
@@ -17,6 +18,42 @@ const relationColor: Record<string, string> = {
 
 export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelectNode }: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const pendingFocusRef = useRef<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const hasQuery = debouncedQuery !== '';
+  const matchIds = useMemo(() => {
+    const term = debouncedQuery.toLowerCase();
+    if (!term) return null;
+    const ids = new Set<string>();
+    for (const node of graph.nodes) {
+      if (node.name.toLowerCase().includes(term)) ids.add(node.id);
+    }
+    if (ids.size) return ids;
+    for (const node of graph.nodes) {
+      if (node.definition.toLowerCase().includes(term) || node.example.toLowerCase().includes(term)) {
+        ids.add(node.id);
+      }
+    }
+    return ids;
+  }, [graph, debouncedQuery]);
+
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const term = query.trim().toLowerCase();
+    const byName = graph.nodes.filter((node) => node.name.toLowerCase().includes(term));
+    const byContent = graph.nodes.filter((node) =>
+      !node.name.toLowerCase().includes(term)
+      && (node.definition.toLowerCase().includes(term) || node.example.toLowerCase().includes(term)),
+    );
+    return [...byName, ...byContent].slice(0, 8);
+  }, [graph, query]);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -33,6 +70,8 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
             type: node.type,
             mastered: node.mastered,
             selected: node.id === selectedNodeId,
+            matched: hasQuery && matchIds?.has(node.id),
+            dimmed: hasQuery && !matchIds?.has(node.id),
           },
         })),
         edges: graph.edges.map((edge) => ({
@@ -43,6 +82,7 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
             label: edge.label,
             relation: edge.relation,
             inPath: pathEdgeIds.includes(edge.id),
+            dimmed: hasQuery,
           },
         })),
       },
@@ -54,9 +94,19 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
       node: {
         style: {
           size: 42,
-          fill: (datum: any) => (datum.data?.mastered ? '#d6f5e5' : datum.data?.selected ? '#ffe4c7' : '#eef4ff'),
-          stroke: (datum: any) => (datum.data?.selected ? '#f2994a' : '#365f91'),
-          lineWidth: (datum: any) => (datum.data?.selected ? 3 : 1.5),
+          fill: (datum: any) => {
+            if (datum.data?.matched) return '#ffe08a';
+            if (datum.data?.mastered) return '#d6f5e5';
+            if (datum.data?.selected) return '#ffe4c7';
+            return '#eef4ff';
+          },
+          stroke: (datum: any) => {
+            if (datum.data?.matched) return '#f2994a';
+            if (datum.data?.selected) return '#f2994a';
+            return '#365f91';
+          },
+          lineWidth: (datum: any) => (datum.data?.selected || datum.data?.matched ? 3 : 1.5),
+          opacity: (datum: any) => (datum.data?.dimmed ? 0.22 : 1),
           labelText: (datum: any) => datum.data?.label,
           labelPlacement: 'bottom',
           labelFill: '#1f2937',
@@ -67,6 +117,7 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
         style: {
           stroke: (datum: any) => relationColor[datum.data?.relation] ?? '#97a2b0',
           lineWidth: (datum: any) => (datum.data?.inPath ? 3 : 1.3),
+          opacity: (datum: any) => (datum.data?.dimmed ? 0.12 : 1),
           endArrow: true,
           labelText: (datum: any) => datum.data?.label,
           labelFill: '#4b5563',
@@ -86,14 +137,51 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
     let disposed = false;
     void instance.render().then(() => {
       renderFinished = true;
-      if (disposed) instance.destroy();
+      if (disposed) { instance.destroy(); return; }
+      const focusId = pendingFocusRef.current;
+      if (focusId) {
+        pendingFocusRef.current = null;
+        try { instance.focusElement(focusId); } catch { /* 聚焦失败不影响使用 */ }
+      }
     });
 
     return () => {
       disposed = true;
       if (renderFinished) instance.destroy();
     };
-  }, [graph, onSelectNode, pathEdgeIds, selectedNodeId]);
+  }, [graph, onSelectNode, pathEdgeIds, selectedNodeId, hasQuery, matchIds]);
 
-  return <div ref={containerRef} className="graph-canvas" />;
+  const pickResult = (node: KnowledgeNode) => {
+    pendingFocusRef.current = node.id;
+    setQuery('');
+    onSelectNode(node);
+  };
+
+  return (
+    <div className="graph-container">
+      <div ref={containerRef} className="graph-canvas" />
+      <div className="graph-search">
+        <Search size={15} />
+        <input
+          placeholder="搜索知识点"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && results.length) pickResult(results[0]);
+            if (event.key === 'Escape') setQuery('');
+          }}
+        />
+        {query && <button className="graph-search-clear" title="清空搜索" onClick={() => setQuery('')}><X size={14} /></button>}
+        {query.trim() && (
+          <div className="graph-search-results">
+            {results.length ? results.map((node) => (
+              <button key={node.id} onClick={() => pickResult(node)}>
+                <span className="node-type">{node.type}</span><span className="result-name">{node.name}</span>
+              </button>
+            )) : <p>未找到匹配知识点</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

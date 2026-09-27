@@ -1,7 +1,7 @@
 import type {
   AIStatus, AuthResult, Classroom, Course, DashboardStats, DiagnosisResult, DocumentImpact, DocumentInfo,
   ExerciseGenerateRequest, ExerciseResult, ExtractionJob, GraphQuality, GraphVersion, ImportCommitResult, ImportPreview, IntegrationStatus,
-  KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, Ticket, User,
+  KnowledgeEdge, KnowledgeGraph, KnowledgeNode, LearningPathResult, QAResult, TestResult, Ticket, User,
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000';
@@ -37,6 +37,87 @@ const json = (method: string, body?: unknown): RequestInit => ({
   headers: { 'Content-Type': 'application/json' },
   body: body === undefined ? undefined : JSON.stringify(body),
 });
+
+export interface StreamQaHandlers {
+  onDelta: (text: string) => void;
+  onStart?: (mode: string) => void;
+  onDone: (payload: { answer: string; citations: KnowledgeNode[]; evidence: QAResult['evidence']; confidence: string; mode: string }) => void;
+  onError?: (message: string) => void;
+}
+
+export function streamClassQa(
+  classroomId: string,
+  question: string,
+  handlers: StreamQaHandlers,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    fetch(`${API_BASE}/api/classrooms/${classroomId}/qa/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ question }),
+    }).then(async (response) => {
+      if (!response.ok) {
+        if (response.status === 401) {
+          setAccessToken('');
+          window.dispatchEvent(new Event('coursegraph:unauthorized'));
+        }
+        const payload = await response.json().catch(() => undefined) as { detail?: string } | undefined;
+        reject(new Error(payload?.detail || `请求失败（${response.status}）`));
+        return;
+      }
+      if (!response.body) { reject(new Error('流式响应不可用')); return; }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finished = false;
+      let failed = false;
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() ?? '';
+          for (const frame of frames) {
+            let event = 'message';
+            let data = '';
+            for (const line of frame.split('\n')) {
+              if (line.startsWith('event:')) event = line.slice(6).trim();
+              else if (line.startsWith('data:')) data += line.slice(5).trim();
+            }
+            if (!data) continue;
+            let parsed: unknown;
+            try { parsed = JSON.parse(data); } catch { continue; }
+            const payload = parsed as Record<string, unknown>;
+            if (event === 'start') handlers.onStart?.(String(payload.mode ?? ''));
+            else if (event === 'delta') handlers.onDelta(String(payload.text ?? ''));
+            else if (event === 'done') {
+              finished = true;
+              handlers.onDone({
+                answer: String(payload.answer ?? ''),
+                citations: (payload.citations ?? []) as KnowledgeNode[],
+                evidence: (payload.evidence ?? []) as QAResult['evidence'],
+                confidence: String(payload.confidence ?? ''),
+                mode: String(payload.mode ?? ''),
+              });
+            } else if (event === 'error') {
+              failed = true;
+              handlers.onError?.(String(payload.message ?? '回答生成失败'));
+            }
+          }
+        }
+      } catch (reason) {
+        reject(reason instanceof Error ? reason : new Error('流式连接中断'));
+        return;
+      }
+      if (failed) { reject(new Error('回答生成失败')); return; }
+      if (!finished) { reject(new Error('回答生成中断')); return; }
+      resolve();
+    }).catch((reason) => reject(reason instanceof Error ? reason : new Error('网络请求失败')));
+  });
+}
 
 export const api = {
   aiStatus: () => request<AIStatus>('/api/ai/status'),
@@ -95,6 +176,9 @@ export const api = {
   classPath: (classroomId: string) => request<LearningPathResult>(`/api/classrooms/${classroomId}/learning-path`, json('POST', {})),
   diagnosis: (classroomId: string) => request<DiagnosisResult>(`/api/classrooms/${classroomId}/diagnosis`),
   exercises: (classroomId: string, payload?: ExerciseGenerateRequest) => request<ExerciseResult[]>(`/api/classrooms/${classroomId}/exercises`, payload ? json('POST', payload) : { method: 'POST' }),
+  nodeTest: (classroomId: string, nodeId: string) => request<TestResult>(`/api/classrooms/${classroomId}/nodes/${nodeId}/test`, { method: 'POST' }),
+  submitNodeTest: (classroomId: string, nodeId: string, testId: string, answers: number[]) =>
+    request<TestResult>(`/api/classrooms/${classroomId}/nodes/${nodeId}/test/${testId}/submit`, json('POST', { answers })),
   previewImport: (classroomId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);

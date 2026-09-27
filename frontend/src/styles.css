@@ -292,6 +292,49 @@ details.surface label { margin-bottom: 12px; }
 .exercise-result-summary b { color: var(--primary-deep); }
 .exercise-results { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; padding-right: 4px; }
 
+/* Spinner and streaming QA */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width: 16px; height: 16px; flex: 0 0 auto; border: 2px solid rgba(109,94,240,.25); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+.qa-thinking { display: flex; align-items: center; gap: 9px; border-left: 3px solid var(--info); border-radius: 8px; padding: 12px; color: var(--ink-soft); background: var(--info-soft); font-size: 13px; }
+
+/* Graph node search */
+.graph-container { position: relative; height: 100%; }
+.graph-container .graph-canvas { height: 100%; }
+.graph-search { position: absolute; top: 12px; left: 12px; z-index: 3; width: 240px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-strong); border-radius: 12px; padding: 7px 10px; background: rgba(255,255,255,.94); box-shadow: var(--shadow-card); backdrop-filter: blur(8px); }
+.graph-search > svg { color: var(--ink-faint); }
+.graph-search input { min-height: 28px; border: 0; padding: 0; background: transparent; box-shadow: none; }
+.graph-search input:focus { border: 0; box-shadow: none; }
+.graph-search-clear { border: 0; border-radius: 6px; padding: 4px; color: var(--ink-faint); background: transparent; }
+.graph-search-clear:hover { color: var(--ink); background: var(--primary-soft); }
+.graph-search-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 12px; padding: 6px; background: rgba(255,255,255,.97); box-shadow: var(--shadow-raised); display: flex; flex-direction: column; gap: 2px; }
+.graph-search-results button { min-height: 34px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 8px; padding: 6px 9px; color: var(--ink); text-align: left; background: transparent; font-size: 13px; }
+.graph-search-results button:hover { background: var(--primary-soft); }
+.graph-search-results .node-type { padding: 2px 7px; font-size: 10px; }
+.graph-search-results .result-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graph-search-results p { margin: 6px 8px; color: var(--ink-faint); font-size: 12px; }
+
+/* Mastery test modal */
+.test-modal { width: min(680px, 100%); max-height: min(820px, calc(100vh - 40px)); display: flex; flex-direction: column; overflow: hidden; }
+.test-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 44px 0; color: var(--ink-soft); font-size: 14px; }
+.test-progress { margin: 14px 0 4px; color: var(--ink-soft); font-size: 12px; }
+.test-questions { min-height: 0; margin-top: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
+.test-question > p { margin-bottom: 8px; color: var(--ink); font-size: 13.5px; line-height: 1.6; }
+.test-question > p .node-type { margin-left: 8px; padding: 2px 8px; font-size: 10px; vertical-align: 1px; }
+.test-option { margin-bottom: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: row; align-items: center; gap: 9px; color: var(--ink-soft); background: var(--surface-solid); font-size: 13px; font-weight: 500; cursor: pointer; }
+.test-option input { width: 16px; min-height: auto; }
+.test-option.selected { border-color: var(--primary); color: var(--primary-deep); background: var(--primary-soft); }
+.test-option.static { cursor: default; }
+.test-option.static svg { margin-left: auto; color: var(--success); }
+.test-option.correct { border-color: rgba(18,168,123,.5); color: #0b7a59; background: var(--success-soft); }
+.test-option.wrong { border-color: rgba(229,72,77,.5); color: #b4232a; background: var(--error-soft); }
+.test-explain { display: block; margin-top: 4px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.test-result { margin: 14px 0 4px; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; }
+.test-result.passed { border: 1px solid rgba(18,168,123,.35); color: #0b7a59; background: var(--success-soft); }
+.test-result.failed { border: 1px solid rgba(229,72,77,.35); color: #b4232a; background: var(--error-soft); }
+.test-result b { font-size: 15px; }
+.test-result span { font-size: 13px; }
+.test-result p { margin: 2px 0 0; font-size: 12px; }
+
 @media (min-width: 1181px) {
   .learning-grid > .graph-workspace { position: sticky; top: 92px; height: clamp(520px, calc(100vh - 116px), 760px); min-height: 0; }
   .learning-grid > .graph-workspace .graph-canvas { height: 100%; min-height: 0; }

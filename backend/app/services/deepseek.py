@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import time
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +14,9 @@ import httpx
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 
-from app.models import ExerciseResult, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, SourceReference
+from app.models import (
+    ExerciseResult, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, SourceReference, TestQuestion,
+)
 from app.services.extractor import RELATION_LABELS, build_mock_graph
 
 
@@ -63,6 +67,20 @@ class GeneratedExercise(BaseModel):
 
 class GeneratedExerciseSet(BaseModel):
     exercises: list[GeneratedExercise] = Field(default_factory=list)
+
+
+class GeneratedTestQuestion(BaseModel):
+    question_type: str = "基础题"
+    difficulty: str = "基础"
+    question: str
+    options: list[str] = Field(default_factory=list)
+    answer_index: int = 0
+    explanation: str = ""
+    evidence_ids: list[int] = Field(default_factory=list)
+
+
+class GeneratedTestSet(BaseModel):
+    questions: list[GeneratedTestQuestion] = Field(default_factory=list)
 
 
 def configured() -> bool:
@@ -137,21 +155,36 @@ def _merge_extracted_graphs(base: ExtractedGraph, addition: ExtractedGraph) -> E
 
 def answer_with_evidence(question: str, evidence: list[dict]) -> str:
     if not configured():
-        if not evidence:
-            return "课程资料中没有足够证据回答这个问题。"
-        snippets = [
-            (index, str(item.get("excerpt", ""))[:80])
-            for index, item in enumerate(evidence[:3], start=1)
-            if item.get("excerpt")
-        ]
-        if not snippets:
-            return "课程资料中没有足够证据回答这个问题。"
-        details = "\n".join(
-            f"{position}. {snippet}[{evidence_id}]"
-            for position, (evidence_id, snippet) in enumerate(snippets, start=1)
-        )
-        return f"结论：课程资料中找到了与问题相关的信息。\n{details}\n说明：当前使用本地规则整理，请结合下方证据核对具体关系。"
-    payload = _chat_payload(
+        return _offline_answer(evidence)
+    return _plain_text(_chat(_answer_payload(question, evidence), timeout_seconds=12.0, attempts=1, capability="graphrag_qa"))
+
+
+def answer_with_evidence_stream(question: str, evidence: list[dict]) -> Iterator[str]:
+    if not configured():
+        yield _offline_answer(evidence)
+        return
+    yield from _chat_stream(_answer_payload(question, evidence), capability="graphrag_qa")
+
+
+def _offline_answer(evidence: list[dict]) -> str:
+    if not evidence:
+        return "课程资料中没有足够证据回答这个问题。"
+    snippets = [
+        (index, str(item.get("excerpt", ""))[:80])
+        for index, item in enumerate(evidence[:3], start=1)
+        if item.get("excerpt")
+    ]
+    if not snippets:
+        return "课程资料中没有足够证据回答这个问题。"
+    details = "\n".join(
+        f"{position}. {snippet}[{evidence_id}]"
+        for position, (evidence_id, snippet) in enumerate(snippets, start=1)
+    )
+    return f"结论：课程资料中找到了与问题相关的信息。\n{details}\n说明：当前使用本地规则整理，请结合下方证据核对具体关系。"
+
+
+def _answer_payload(question: str, evidence: list[dict]) -> dict:
+    return _chat_payload(
         system=(
             "你是面向高校学生的课程助教。课程图谱和课件证据用于确定当前课程语境，但不是知识上限。"
             "回答时先使用编号证据，再使用你自身掌握的稳定、通用学科知识补全证据没有展开的内容。"
@@ -169,7 +202,44 @@ def answer_with_evidence(question: str, evidence: list[dict]) -> str:
         user=f"问题：{question}\n\n编号课程证据：\n{_evidence_context(evidence) or '（未检索到课程证据）'}",
         max_tokens=900,
     )
-    return _plain_text(_chat(payload, timeout_seconds=12.0, attempts=1, capability="graphrag_qa"))
+
+
+def _chat_stream(payload: dict, capability: str = "general") -> Iterator[str]:
+    base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+    headers = {"Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}", "Content-Type": "application/json"}
+    started_at = time.perf_counter()
+    parts: list[str] = []
+    try:
+        with httpx.Client(timeout=httpx.Timeout(60.0, connect=8.0)) as client:
+            with client.stream(
+                "POST", f"{base_url}/chat/completions",
+                headers=headers, json={**payload, "stream": True},
+            ) as response:
+                if response.status_code == 429 or response.status_code >= 500:
+                    raise RuntimeError(f"DeepSeek 服务暂时不可用（{response.status_code}）")
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = chunk.get("choices") or []
+                    text = (choices[0].get("delta", {}).get("content") or "") if choices else ""
+                    if text:
+                        parts.append(text)
+                        yield text
+    except (httpx.HTTPError, KeyError, IndexError, RuntimeError, ValueError) as exc:
+        _record_usage(capability, "failed", {}, started_at, str(exc))
+        raise ValueError(f"DeepSeek 调用失败：{exc}") from exc
+    if not "".join(parts).strip():
+        _record_usage(capability, "failed", {}, started_at, "DeepSeek 返回空内容")
+        raise ValueError("DeepSeek 返回空内容")
+    _record_usage(capability, "success", {}, started_at)
 
 
 def learning_analysis(
@@ -252,6 +322,78 @@ def offline_exercises(
     nodes: list[KnowledgeNode], evidence: list[dict], question_types: list[str] | None = None, count: int = 3,
 ) -> list[ExerciseResult]:
     return _offline_exercises(nodes, evidence, question_types, count)
+
+
+def test_questions(
+    course_name: str,
+    node: KnowledgeNode,
+    all_nodes: list[KnowledgeNode],
+    evidence: list[dict],
+    count: int = 5,
+) -> list[TestQuestion]:
+    count = max(1, min(10, count))
+    if not configured():
+        return _offline_test_questions(node, all_nodes, count)
+    node_context = (
+        f"知识点：{node.name}\n定义：{node.definition or '（无）'}\n示例：{node.example or '（无）'}"
+    )
+    related = "、".join(other.name for other in all_nodes if other.id != node.id)[:200] or "无"
+    payload = _chat_payload(
+        system="只输出合法 json，不要输出 Markdown。题目必须能由给定知识点内容和课程证据作答，不得引入课外事实。",
+        user=(
+            f"请为《{course_name}》的知识点“{node.name}”生成恰好{count}道单选题，用于掌握测试。\n"
+            f"{node_context}\n课程证据：\n{_evidence_context(evidence)}\n"
+            f"可作干扰项参考的其他知识点：{related}\n"
+            "要求：每道题恰好4个选项、仅一个正确；题型在 基础题/应用题/易错题 中尽量均匀分配；"
+            "选项不要出现‘以上都对/以上都不对’。题目考察对概念的理解与应用，"
+            "严禁出背诵题或回忆课程原文的题（例如‘以下哪个选项是课程中给出的示例’），"
+            "题干与选项都用你自己的话改写知识点内容，不要求回忆课件原句。输出 json："
+            '{"questions":[{"question_type":"基础题","difficulty":"基础","question":"","options":["","","",""],"answer_index":0,"explanation":""}]}'
+        ),
+        max_tokens=min(5000, 800 + count * 500),
+        json_output=True,
+    )
+    try:
+        generated = GeneratedTestSet.model_validate(json.loads(
+            _chat(payload, timeout_seconds=20.0, attempts=1, capability="test_generation")
+        ))
+    except (json.JSONDecodeError, ValidationError) as exc:
+        raise ValueError("DeepSeek 返回的测试结构不合法") from exc
+    results: list[TestQuestion] = []
+    for item in generated.questions[:count]:
+        options = [str(option).strip() for option in item.options if str(option).strip()][:4]
+        if len(options) != 4 or not item.question.strip() or not (0 <= item.answer_index < 4):
+            continue
+        if _is_memorization_question(item.question):
+            continue
+        sources = [evidence[index - 1] for index in item.evidence_ids if 0 < index <= len(evidence)]
+        results.append(
+            TestQuestion(
+                question=item.question.strip(), question_type=item.question_type,
+                difficulty=item.difficulty, options=options, answer_index=item.answer_index,
+                explanation=item.explanation.strip(), sources=sources,
+            )
+        )
+    if len(results) < count:
+        results.extend(_offline_test_questions(node, all_nodes, count)[len(results):count])
+    return results[:count]
+
+
+_MEMORIZATION_MARKERS = (
+    "课程中给出", "课程中使用的", "课程中使用", "课程中用到", "课程中介绍", "课程中列举",
+    "课程中提到的", "课件中", "教材中", "课程原文", "原文中", "资料中", "文中提到",
+    "根据课程内容", "根据课件",
+)
+
+
+def _is_memorization_question(text: str) -> bool:
+    return any(marker in text for marker in _MEMORIZATION_MARKERS)
+
+
+def offline_test_questions(
+    node: KnowledgeNode, all_nodes: list[KnowledgeNode], count: int = 5,
+) -> list[TestQuestion]:
+    return _offline_test_questions(node, all_nodes, count)
 
 
 def _request_extracted_graph(course_name: str, corpus: str, repair: bool, current: str = "") -> ExtractedGraph:
@@ -518,6 +660,47 @@ def _offline_exercises(
                 answer=node.definition or f"围绕 {node.name} 的核心定义作答。",
                 explanation=explanation,
                 question_type=question_type, difficulty=difficulty, sources=evidence[:2], mode="offline-rule",
+            )
+        )
+    return results
+
+
+def _offline_test_questions(
+    node: KnowledgeNode, all_nodes: list[KnowledgeNode], count: int = 5,
+) -> list[TestQuestion]:
+    types = ["基础题", "应用题", "易错题"]
+    difficulty_by_type = {"基础题": "基础", "应用题": "中等", "易错题": "中等"}
+    other_definitions = [
+        other.definition.strip()
+        for other in all_nodes
+        if other.id != node.id and other.definition.strip()
+    ]
+    results: list[TestQuestion] = []
+    for index in range(max(1, min(10, count))):
+        question_type = types[index % len(types)]
+        if question_type == "基础题":
+            stem = f"以下关于“{node.name}”的描述，正确的是哪一项？"
+            correct = node.definition.strip() or f"“{node.name}”是本课程中的一个知识点。"
+        elif question_type == "应用题":
+            stem = f"在课程场景中应用“{node.name}”解决实际问题时，以下做法正确的是？"
+            correct = node.example.strip() or f"结合“{node.name}”的定义，选择与课程内容一致的用法。"
+        else:
+            stem = f"学习“{node.name}”时容易出现的误区是？"
+            correct = f"忽略其适用条件而直接套用，是学习“{node.name}”时的常见误区。"
+        distractors = other_definitions[index * 3:index * 3 + 3]
+        while len(distractors) < 3:
+            distractors.append(f"“{node.name}”与本课程其他知识点没有联系。")
+        order = list(range(4))
+        random.shuffle(order)
+        options = [correct] + distractors[:3]
+        shuffled = [options[position] for position in order]
+        answer_index = shuffled.index(correct)
+        results.append(
+            TestQuestion(
+                question=stem, question_type=question_type,
+                difficulty=difficulty_by_type.get(question_type, "中等"),
+                options=shuffled, answer_index=answer_index,
+                explanation=node.example or node.definition or "对照知识点定义与示例核对选项。",
             )
         )
     return results
