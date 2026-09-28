@@ -124,9 +124,7 @@ export default function GraphView({ graph, selectedNodeId, pathEdgeIds, onSelect
           labelFontSize: 10,
         },
       },
-      // 不启用 zoom-canvas：滚轮缩放会拦截画布上的滚轮事件（preventDefault），
-      // 导致鼠标悬停图谱时页面无法随滚轮上下滚动。图谱通过 autoFit 自动适配视口。
-      behaviors: ['drag-canvas', 'drag-element'],
+      behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element'],
     });
 
     instance.on?.('node:click', (event: any) => {

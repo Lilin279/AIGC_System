@@ -335,10 +335,7 @@ details.surface label { margin-bottom: 12px; }
 .test-result span { font-size: 13px; }
 .test-result p { margin: 2px 0 0; font-size: 12px; }
 
-@media (min-width: 1181px) {
-  .learning-grid > .graph-workspace { position: sticky; top: 92px; height: clamp(520px, calc(100vh - 116px), 760px); min-height: 0; }
-  .learning-grid > .graph-workspace .graph-canvas { height: 100%; min-height: 0; }
-}
+/* 图谱面板随页面滚动，不粘在视口顶部 */
 
 /* Search, tickets and empty states */
 .search-box { min-width: 280px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding-left: 10px; display: flex; align-items: center; color: var(--ink-faint); background: #fff; }
