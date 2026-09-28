@@ -171,6 +171,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .graph-workspace { min-height: 720px; padding: 0; overflow: hidden; background: rgba(255,255,255,.76); }
 .graph-workspace .surface-title { padding: 20px 22px 0; }
 .graph-canvas { width: 100%; min-height: 620px; }
+.teacher-graph-workspace { position: sticky; top: 92px; height: calc(100vh - 108px); min-height: 520px; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.teacher-graph-workspace .graph-container, .teacher-graph-workspace .graph-canvas { min-height: 0; }
 .studio-side, .learning-side { display: flex; flex-direction: column; gap: 14px; }
 details.surface { padding: 0; overflow: hidden; }
 details.surface > summary { min-height: 52px; padding: 0 16px; display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; list-style: none; }
@@ -335,8 +337,6 @@ details.surface label { margin-bottom: 12px; }
 .test-result span { font-size: 13px; }
 .test-result p { margin: 2px 0 0; font-size: 12px; }
 
-/* 图谱面板随页面滚动，不粘在视口顶部 */
-
 /* Search, tickets and empty states */
 .search-box { min-width: 280px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding-left: 10px; display: flex; align-items: center; color: var(--ink-faint); background: #fff; }
 .search-box input { border: 0; box-shadow: none; }
@@ -372,6 +372,13 @@ details.surface label { margin-bottom: 12px; }
   .studio-side, .learning-side { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
   .graph-workspace { min-height: 600px; }
   .graph-canvas { min-height: 520px; }
+}
+
+@media (min-width: 681px) and (max-width: 820px) {
+  .studio-grid { grid-template-columns: minmax(0, 1fr) minmax(250px, 34vw); gap: 12px; }
+  .studio-side { display: flex; }
+  .teacher-graph-workspace { min-height: 520px; }
+  .teacher-graph-workspace .graph-canvas { min-height: 0; }
 }
 
 @media (max-width: 820px) {
@@ -413,6 +420,11 @@ details.surface label { margin-bottom: 12px; }
   .exercise-type-grid { grid-template-columns: 1fr; }
   .exercise-modal { max-height: calc(100vh - 24px); padding: 17px; }
   .reply { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 680px) {
+  .teacher-graph-workspace { position: relative; top: auto; height: auto; min-height: 600px; display: block; }
+  .teacher-graph-workspace .graph-canvas { min-height: 520px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
